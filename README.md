@@ -2,6 +2,10 @@
 
 A browser-based 3D scene editor for experimenting with real-time lighting, shadows, and translucent color mixing - built entirely with vanilla JavaScript and WebGL2.
 
+**[Interactive Demo](https://xedur.github.io/webgl2-lighting-playground/)**
+
+![WebGL2 Lighting Playground](webgl2-lighting-playground.png)
+
 ## What Is This?
 
 WebGL2 Lighting Playground is an interactive tool that lets you place objects and lights in a 3D scene and see how they interact in real time. Its standout feature is an **additive colored light model**: light passing through translucent objects becomes tinted, and tinted lights mix additively - just like real colored light. A red cube and a green cube next to each other will cast overlapping yellow light on the ground behind them.
