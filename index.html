@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL2 Lighting Playground</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <canvas id="gl-canvas"></canvas>
+
+        <!-- Top Bar -->
+        <header id="top-bar">
+            <div class="logo">
+                <span class="logo-icon">◈</span>
+                <span class="logo-text">WebGL2 Lighting Playground</span>
+            </div>
+            <div class="top-controls">
+                <div class="quality-selector">
+                    <label>Quality:</label>
+                    <select id="quality-preset">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high" selected>High</option>
+                        <option value="ultra">Ultra</option>
+                    </select>
+                </div>
+                <div class="shadow-toggle">
+                    <label>
+                        <input type="checkbox" id="soft-shadows" checked>
+                        Soft Shadows
+                    </label>
+                </div>
+                <button id="reset-scene" class="btn btn-secondary">Reset Scene</button>
+            </div>
+            <div class="stats">
+                <span id="fps-counter">60 FPS</span>
+                <span id="draw-calls">0 draws</span>
+            </div>
+        </header>
+
+        <!-- Left Panel: Scene Hierarchy -->
+        <aside id="left-panel" class="panel">
+            <div class="panel-header">
+                <h3>Scene</h3>
+                <div class="panel-actions">
+                    <button id="add-object-btn" class="btn btn-add" title="Add Object">ADD +</button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="add-menu" id="add-menu">
+                    <div class="add-menu-section">
+                        <h4>Objects</h4>
+                        <button data-type="cube" class="add-item">
+                            <span class="icon">□</span> Cube
+                        </button>
+                        <button data-type="sphere" class="add-item">
+                            <span class="icon">○</span> Sphere
+                        </button>
+                    </div>
+                    <div class="add-menu-section">
+                        <h4>Lights</h4>
+                        <button data-type="directional" class="add-item">
+                            <span class="icon">☀</span> Directional
+                        </button>
+                        <button data-type="point" class="add-item">
+                            <span class="icon">●</span> Point Light
+                        </button>
+                        <button data-type="spot" class="add-item">
+                            <span class="icon">◎</span> Spotlight
+                        </button>
+                    </div>
+                </div>
+                <ul id="scene-list" class="scene-list"></ul>
+            </div>
+        </aside>
+
+        <!-- Right Panel: Properties -->
+        <aside id="right-panel" class="panel">
+            <div class="panel-header">
+                <h3>Properties</h3>
+            </div>
+            <div class="panel-content" id="properties-content">
+                <div class="no-selection">
+                    <p>Select an object or light to edit its properties</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Bottom Toolbar -->
+        <footer id="toolbar">
+            <span class="footer-left">Yes, there are bugs and issues.<br>No, I don't plan on fixing them.</span>
+
+            <div class="tool-group">
+                <span class="tool-group-tag">Object</span>
+                <button id="tool-select" class="tool-btn active" title="Select (Q)">
+                    <span class="tool-icon">⊡</span>
+                </button>
+                <button id="tool-move" class="tool-btn" title="Move (W)">
+                    <span class="tool-icon">✥</span>
+                </button>
+                <button id="tool-rotate" class="tool-btn" title="Rotate (E)">
+                    <span class="tool-icon">↻</span>
+                </button>
+                <button id="tool-scale" class="tool-btn" title="Scale (R)">
+                    <span class="tool-icon">⤢</span>
+                </button>
+                <span class="tool-group-divider"></span>
+                <button id="delete-btn" class="tool-btn" title="Delete (Del)">
+                    <span class="tool-icon">✕</span>
+                </button>
+                <button id="duplicate-btn" class="tool-btn" title="Duplicate (Ctrl+D)">
+                    <span class="tool-icon">⧉</span>
+                </button>
+            </div>
+            <div class="tool-group">
+                <span class="tool-group-tag">History</span>
+                <button id="undo-btn" class="tool-btn" title="Undo (Ctrl+Z)">
+                    <span class="tool-icon">↶</span>
+                </button>
+                <button id="redo-btn" class="tool-btn" title="Redo (Ctrl+Y)">
+                    <span class="tool-icon">↷</span>
+                </button>
+            </div>
+            <div class="camera-controls-hint">
+                <span>🖱️ Left drag: Orbit</span>
+                <span>🖱️ Right drag: Pan</span>
+                <span>⚙️ Scroll: Zoom</span>
+            </div>
+
+            <span class="footer-right">
+                <a href="https://www.erantanen.com" target="_blank" rel="noopener">&copy; 2025-2026 Eetu Rantanen</a>
+                <a class="repo-link" href="https://github.com/XeduR/webgl-lighting-playground" target="_blank" rel="noopener">Source available at: <img src="images/GitHub_Lockup_White.svg" alt="GitHub" height="16"></a>
+            </span>
+        </footer>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
