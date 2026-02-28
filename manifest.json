@@ -1,5 +1,11 @@
 {
- "name": "App",
+ "name": "WebGL2 Lighting Playground",
+ "short_name": "Lighting Playground",
+ "description": "A browser-based 3D scene editor for experimenting with real-time lighting, shadows, and translucent color mixing - built with vanilla JavaScript and WebGL2.",
+ "start_url": ".",
+ "display": "standalone",
+ "background_color": "#1a1a2e",
+ "theme_color": "#ffffff",
  "icons": [
   {
    "src": "\/android-icon-36x36.png",
