@@ -456,16 +456,16 @@ export class UIController {
             item.innerHTML = `
                 <span class="icon">${icons[entity.geometryType] || '■'}</span>
                 <span class="name">${escHTML(entity.name)}</span>
-                <span class="visibility">${entity.visible ? '👁' : '○'}</span>
+                <span class="visibility">${entity.visible ? '\u{1F441}\uFE0E' : '○'}</span>
             `;
         } else {
             const typeClass = `light-${entity.lightType}`;
             item.classList.add(typeClass);
-            const icons = { directional: '☀', point: '●', spot: '◎' };
+            const icons = { directional: '\u2600\uFE0E', point: '●', spot: '◎' };
             item.innerHTML = `
                 <span class="icon">${icons[entity.lightType] || '★'}</span>
                 <span class="name">${escHTML(entity.name)}</span>
-                <span class="visibility">${entity.visible ? '👁' : '○'}</span>
+                <span class="visibility">${entity.visible ? '\u{1F441}\uFE0E' : '○'}</span>
             `;
         }
 

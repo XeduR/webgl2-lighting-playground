@@ -218,7 +218,7 @@ export class Renderer {
         const program = createProgram(gl, Shaders.GIZMO_VERTEX_SHADER, Shaders.GIZMO_FRAGMENT_SHADER);
         return {
             program,
-            uniforms: getUniformLocations(gl, program, ["uViewMatrix", "uProjectionMatrix", "uModelMatrix"]),
+            uniforms: getUniformLocations(gl, program, ["uViewMatrix", "uProjectionMatrix", "uModelMatrix", "uNdcOffset"]),
             attributes: getAttributeLocations(gl, program, ["aPosition", "aColor"])
         };
     }

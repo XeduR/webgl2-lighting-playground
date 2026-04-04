@@ -17,6 +17,19 @@ const ARROW_HEAD = 0.2;
 const RING_RADIUS = 1.5;
 const RING_SEGMENTS = 64;
 const HIT_THRESHOLD = 0.12;
+// Finger-friendly tolerance. Relative to the (larger) mobile gizmo scale, so
+// the absolute pickable radius ends up slightly smaller than the old 0.5 * 0.08
+// while the visible arrows/rings are noticeably bigger.
+const TOUCH_HIT_THRESHOLD = 0.3;
+
+// Mobile viewports get longer gizmos and a thickening pass. Matches the CSS
+// mobile breakpoint in style.css so the JS and layout agree on "mobile".
+const GIZMO_SCALE_DESKTOP = 0.08;
+const GIZMO_SCALE_MOBILE = 0.12;
+// Half-extent (in drawing-buffer pixels) of the offset grid used to fake line
+// thickness. Radius 1 → 3x3 grid → 3px thick lines. Copies are 1 buffer pixel
+// apart so they merge into a solid line instead of reading as distinct arrows.
+const GIZMO_THICKEN_RADIUS = 1;
 
 export class ToolController {
     constructor(canvas, camera, scene, controls, ui) {
@@ -34,6 +47,10 @@ export class ToolController {
         // Drag state
         this.dragStartValue = 0;
         this.dragStartTransform = null;
+        // Snapshot of the canvas rect at drag start. Mobile browsers (Chrome Android especially)
+        // can toggle the URL bar mid-drag, which changes getBoundingClientRect() height between
+        // touchmove events and causes the dragged object to flicker between two positions.
+        this.dragStartRect = null;
 
         // Gizmo GPU resources (initialized lazily)
         this.glResources = null;
@@ -62,18 +79,30 @@ export class ToolController {
         this._handlers = {
             mousedown: this.onMouseDown.bind(this),
             mousemove: this.onMouseMove.bind(this),
-            mouseup: this.onMouseUp.bind(this)
+            mouseup: this.onMouseUp.bind(this),
+            touchstart: this.onTouchStart.bind(this),
+            touchmove: this.onTouchMove.bind(this),
+            touchend: this.onTouchEnd.bind(this)
         };
         // Use capture phase so we fire before OrbitControls
         this.canvas.addEventListener('mousedown', this._handlers.mousedown, true);
         this.canvas.addEventListener('mousemove', this._handlers.mousemove, true);
         this.canvas.addEventListener('mouseup', this._handlers.mouseup, true);
+        // Touch equivalents - capture + non-passive so we can preventDefault when grabbing a gizmo
+        this.canvas.addEventListener('touchstart', this._handlers.touchstart, { capture: true, passive: false });
+        this.canvas.addEventListener('touchmove', this._handlers.touchmove, { capture: true, passive: false });
+        this.canvas.addEventListener('touchend', this._handlers.touchend, { capture: true, passive: false });
+        this.canvas.addEventListener('touchcancel', this._handlers.touchend, { capture: true, passive: false });
     }
 
     dispose() {
         this.canvas.removeEventListener('mousedown', this._handlers.mousedown, true);
         this.canvas.removeEventListener('mousemove', this._handlers.mousemove, true);
         this.canvas.removeEventListener('mouseup', this._handlers.mouseup, true);
+        this.canvas.removeEventListener('touchstart', this._handlers.touchstart, { capture: true });
+        this.canvas.removeEventListener('touchmove', this._handlers.touchmove, { capture: true });
+        this.canvas.removeEventListener('touchend', this._handlers.touchend, { capture: true });
+        this.canvas.removeEventListener('touchcancel', this._handlers.touchend, { capture: true });
     }
 
     // Check if the current tool is allowed for the given entity
@@ -111,6 +140,7 @@ export class ToolController {
                 this.activeAxis = axis;
                 this.controls.enabled = false;
                 this.canvas.style.cursor = 'grabbing';
+                this.dragStartRect = this.canvas.getBoundingClientRect();
 
                 // Snapshot transform for undo
                 this.dragStartTransform = {
@@ -157,16 +187,85 @@ export class ToolController {
         }
     }
 
-    onMouseUp(e) {
+    // ===== Touch Handlers =====
+    // Mirror the mouse flow: pick on tap, drag gizmo axes in move/rotate/scale.
+    // Only single-finger touches are handled here; multi-touch passes through
+    // to OrbitControls for pinch-zoom.
+
+    onTouchStart(e) {
+        if (e.touches.length !== 1) {
+            // Multi-touch: cancel any in-progress gizmo drag and let orbit take over
+            if (this.isDragging) this.endDrag();
+            return;
+        }
+
+        const t = e.touches[0];
+        const ray = this.screenToRay(t.clientX, t.clientY);
+        const entity = this.scene.selectedEntity;
+
+        if (this.currentTool === 'select') {
+            const hit = this.pickEntity(ray);
+            if (hit) this.scene.selectEntity(hit);
+            return;
+        }
+
+        if (entity && this.isToolAllowed(entity)) {
+            const gizmoScale = this.getGizmoScale(entity);
+            const axis = this.hitTestGizmoHandles(ray, entity.transform.position, gizmoScale, TOUCH_HIT_THRESHOLD);
+
+            if (axis) {
+                e.stopPropagation();
+                e.preventDefault();
+                this.isDragging = true;
+                this.activeAxis = axis;
+                this.controls.enabled = false;
+                this.dragStartRect = this.canvas.getBoundingClientRect();
+
+                this.dragStartTransform = {
+                    position: vec3.clone(entity.transform.position),
+                    rotation: vec3.clone(entity.transform.rotation),
+                    scale: vec3.clone(entity.transform.scale)
+                };
+
+                const axisDir = AXES[axis].dir;
+                this.dragStartValue = this.projectMouseToAxis(ray, entity.transform.position, axisDir);
+                return;
+            }
+        }
+
+        const hit = this.pickEntity(ray);
+        if (hit) this.scene.selectEntity(hit);
+    }
+
+    onTouchMove(e) {
         if (!this.isDragging) return;
+        if (e.touches.length !== 1) {
+            // Second finger arrived mid-drag: cancel gizmo drag
+            this.endDrag();
+            return;
+        }
 
         e.stopPropagation();
         e.preventDefault();
+        const t = e.touches[0];
+        // handleDrag only needs clientX/Y from the event
+        this.handleDrag({ clientX: t.clientX, clientY: t.clientY });
+    }
+
+    onTouchEnd(e) {
+        if (!this.isDragging) return;
+        e.stopPropagation();
+        e.preventDefault();
+        this.endDrag();
+    }
+
+    // Shared end-of-drag cleanup for mouse and touch, including undo snapshot push.
+    endDrag() {
         this.isDragging = false;
         this.controls.enabled = true;
-        this.canvas.style.cursor = this.hoveredAxis ? 'grab' : '';
+        this.canvas.style.cursor = '';
+        this.dragStartRect = null;
 
-        // Push undo
         const entity = this.scene.selectedEntity;
         if (entity && this.dragStartTransform) {
             const before = this.dragStartTransform;
@@ -176,7 +275,6 @@ export class ToolController {
                 scale: vec3.clone(entity.transform.scale)
             };
 
-            // Only push if something actually changed
             const changed = before.position[0] !== after.position[0] ||
                 before.position[1] !== after.position[1] ||
                 before.position[2] !== after.position[2] ||
@@ -199,6 +297,15 @@ export class ToolController {
 
         this.dragStartTransform = null;
         this.activeAxis = null;
+    }
+
+    onMouseUp(e) {
+        if (!this.isDragging) return;
+
+        e.stopPropagation();
+        e.preventDefault();
+        this.endDrag();
+        this.canvas.style.cursor = this.hoveredAxis ? 'grab' : '';
     }
 
     handleDrag(e) {
@@ -254,7 +361,9 @@ export class ToolController {
     // ===== Raycasting =====
 
     screenToRay(clientX, clientY) {
-        const rect = this.canvas.getBoundingClientRect();
+        // Use the snapshotted rect during drags so URL-bar show/hide on mobile can't shift the
+        // projection between frames. Falls back to a fresh rect for hit-tests and hover.
+        const rect = this.dragStartRect || this.canvas.getBoundingClientRect();
         const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
         const ndcY = 1 - ((clientY - rect.top) / rect.height) * 2;
 
@@ -379,13 +488,18 @@ export class ToolController {
 
     // ===== Gizmo Hit Testing =====
 
-    getGizmoScale(entity) {
-        const dist = vec3.distance(this.camera.position, entity.transform.position);
-        return dist * 0.08;
+    isMobileViewport() {
+        return window.matchMedia('(max-width: 900px)').matches;
     }
 
-    hitTestGizmoHandles(ray, center, gizmoScale) {
-        const threshold = gizmoScale * HIT_THRESHOLD;
+    getGizmoScale(entity) {
+        const dist = vec3.distance(this.camera.position, entity.transform.position);
+        const factor = this.isMobileViewport() ? GIZMO_SCALE_MOBILE : GIZMO_SCALE_DESKTOP;
+        return dist * factor;
+    }
+
+    hitTestGizmoHandles(ray, center, gizmoScale, hitThreshold = HIT_THRESHOLD) {
+        const threshold = gizmoScale * hitThreshold;
         let closestAxis = null;
         let closestDist = threshold;
 
@@ -695,9 +809,27 @@ export class ToolController {
         mat4.scale(model, model, vec3.create(s, s, s));
         gl.uniformMatrix4fv(program.uniforms.uModelMatrix, false, model);
 
-        // Draw
+        // Draw. On desktop a single pass; on mobile a small grid of offset passes
+        // to fake thick lines (WebGL2 forces gl.LINES to 1px regardless of lineWidth).
         gl.bindVertexArray(gizmoData.vao);
-        gl.drawArrays(gl.LINES, 0, gizmoData.vertexCount);
+        const offsetLoc = program.uniforms.uNdcOffset;
+
+        if (this.isMobileViewport()) {
+            // 1 drawing-buffer pixel in NDC units. main.js sizes the canvas 1:1
+            // with CSS (no DPR scaling), so buffer pixels == CSS pixels here.
+            const stepX = 2 / gl.drawingBufferWidth;
+            const stepY = 2 / gl.drawingBufferHeight;
+            const r = GIZMO_THICKEN_RADIUS;
+            for (let iy = -r; iy <= r; iy++) {
+                for (let ix = -r; ix <= r; ix++) {
+                    gl.uniform2f(offsetLoc, ix * stepX, iy * stepY);
+                    gl.drawArrays(gl.LINES, 0, gizmoData.vertexCount);
+                }
+            }
+        } else {
+            gl.uniform2f(offsetLoc, 0, 0);
+            gl.drawArrays(gl.LINES, 0, gizmoData.vertexCount);
+        }
         gl.bindVertexArray(null);
 
         gl.enable(gl.DEPTH_TEST);

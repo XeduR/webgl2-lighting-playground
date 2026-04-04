@@ -32,6 +32,7 @@
     --panel-width-right: 400px;
     --toolbar-height: 96px;
     --topbar-height: 44px;
+    --banner-height: 0px;
 
     --radius-sm: 4px;
     --radius-md: 6px;
@@ -66,13 +67,38 @@ body {
 #app {
     display: grid;
     grid-template-columns: var(--panel-width-left) 1fr var(--panel-width-right);
-    grid-template-rows: var(--topbar-height) calc(100vh - var(--topbar-height) - var(--toolbar-height));
+    grid-template-rows: var(--banner-height) var(--topbar-height) calc(100vh - var(--banner-height) - var(--topbar-height) - var(--toolbar-height));
     grid-template-areas:
+        "banner banner banner"
         "topbar topbar topbar"
         "left canvas right";
     height: 100vh;
     width: 100vw;
     overflow: hidden;
+    position: relative;
+}
+
+/* Collapsed panels: zero the column so the canvas expands to fill. */
+#app.left-collapsed {
+    --panel-width-left: 0px;
+}
+
+#app.right-collapsed {
+    --panel-width-right: 0px;
+}
+
+#app.left-collapsed #left-panel,
+#app.right-collapsed #right-panel {
+    display: none;
+}
+
+/* Dismissed banner: zero the row and hide the element. */
+#app.banner-dismissed {
+    --banner-height: 0px;
+}
+
+#app.banner-dismissed #small-viewport-banner {
+    display: none;
 }
 
 #gl-canvas {
@@ -105,16 +131,12 @@ body {
     gap: 10px;
 }
 
-.logo-icon {
-    font-size: 20px;
-    color: var(--accent-primary);
-    text-shadow: 0 0 12px var(--accent-glow);
-}
-
 .logo-text {
     font-weight: 600;
-    font-size: 14px;
+    /* Scales down only on narrow viewports; stays at 14px on normal desktops. */
+    font-size: clamp(10px, 1.7vw, 14px);
     letter-spacing: 0.02em;
+    white-space: nowrap;
 }
 
 .repo-link {
@@ -814,21 +836,12 @@ body {
 }
 
 /* Footer text elements inside toolbar */
-.footer-left, .footer-right {
+.footer-right {
     font-size: 14px;
     color: #ffffff;
     opacity: 0.7;
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-    pointer-events: none;
     position: absolute;
-}
-
-.footer-left {
-    left: 12px;
-    font-style: italic;
-}
-
-.footer-right {
     right: 12px;
     pointer-events: auto;
     display: flex;
@@ -891,4 +904,393 @@ body {
     border-color: var(--warning);
     color: var(--warning);
     cursor: pointer;
+}
+
+/* === Small Viewport Banner === */
+
+#small-viewport-banner {
+    display: none;
+    grid-area: banner;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: rgba(239, 68, 68, 0.18);
+    border-bottom: 1px solid var(--danger);
+    color: var(--danger);
+    font-size: 12px;
+    font-weight: 500;
+    text-align: center;
+    z-index: 150;
+}
+
+#small-viewport-banner button {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+#small-viewport-banner button:hover {
+    color: var(--text-primary);
+}
+
+/* === Panel Toggle Buttons & Backdrop === */
+
+.panel-toggle {
+    position: absolute;
+    top: calc((var(--banner-height) + var(--topbar-height) + 100vh - var(--toolbar-height)) / 2);
+    transform: translateY(-50%);
+    z-index: 25;
+    width: 26px;
+    height: 56px;
+    background: rgba(20, 21, 24, 0.92);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    padding: 0;
+    cursor: pointer;
+    transition: left 0.25s ease, right 0.25s ease, background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.panel-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
+}
+
+.panel-toggle-left {
+    left: calc(var(--panel-width-left) + 4px);
+}
+
+.panel-toggle-right {
+    right: calc(var(--panel-width-right) + 4px);
+}
+
+#panel-backdrop {
+    display: none;
+    position: absolute;
+    top: calc(var(--banner-height) + var(--topbar-height));
+    left: 0;
+    right: 0;
+    bottom: var(--toolbar-height);
+    z-index: 15;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+#panel-backdrop.visible {
+    display: block;
+}
+
+/* === Narrow screens (≤1400px): copyright drops to a second row before it collides with the camera-controls hint === */
+
+@media (max-width: 1400px) {
+    :root {
+        --toolbar-height: 140px;
+    }
+
+    #toolbar {
+        flex-wrap: wrap;
+        row-gap: 8px;
+    }
+
+    .footer-right {
+        position: static;
+        flex-basis: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 4px 16px;
+    }
+}
+
+/* === Mobile (≤900px): panels become overlay drawers === */
+
+@media (max-width: 900px) {
+    :root {
+        --toolbar-height: 140px;
+        --topbar-height: 44px;
+        --banner-height: 56px; /* fits 2-line wrap on narrow phones */
+        --mobile-left-width: min(172px, 68vw);
+        --mobile-right-width: min(212px, 72vw);
+    }
+
+    /* Drop grid columns for panels: canvas fills the content row */
+    #app {
+        --panel-width-left: 0px;
+        --panel-width-right: 0px;
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "banner"
+            "topbar"
+            "canvas";
+    }
+
+    /* Reveal the mobile warning banner (overridden if user dismisses it) */
+    #small-viewport-banner {
+        display: flex;
+    }
+
+    /* Panels become absolute overlay drawers. Override desktop display:none. */
+    #left-panel,
+    #right-panel,
+    #app.left-collapsed #left-panel,
+    #app.right-collapsed #right-panel {
+        display: flex;
+        position: absolute;
+        top: calc(var(--banner-height) + var(--topbar-height));
+        bottom: var(--toolbar-height);
+        height: auto;
+        z-index: 20;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    #left-panel {
+        left: 0;
+        width: var(--mobile-left-width);
+        transform: translateX(-100%);
+    }
+
+    #right-panel {
+        right: 0;
+        width: var(--mobile-right-width);
+        transform: translateX(100%);
+    }
+
+    #app:not(.left-collapsed) #left-panel {
+        transform: translateX(0);
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.55);
+    }
+
+    #app:not(.right-collapsed) #right-panel {
+        transform: translateX(0);
+        box-shadow: -4px 0 20px rgba(0, 0, 0, 0.55);
+    }
+
+    /* Toggle buttons: larger touch targets on mobile, track mobile panel widths. */
+    .panel-toggle {
+        width: 36px;
+        height: 64px;
+        font-size: 14px;
+    }
+
+    .panel-toggle-left {
+        left: 4px;
+    }
+
+    #app:not(.left-collapsed) .panel-toggle-left {
+        left: calc(var(--mobile-left-width) + 4px);
+    }
+
+    .panel-toggle-right {
+        right: 4px;
+    }
+
+    #app:not(.right-collapsed) .panel-toggle-right {
+        right: calc(var(--mobile-right-width) + 4px);
+    }
+
+    /* Top bar: drop logo text, stats, and "Quality:" label to save width. */
+    #top-bar {
+        padding: 0 8px;
+    }
+
+    .stats,
+    .quality-selector label {
+        display: none;
+    }
+
+    .top-controls {
+        gap: 10px;
+    }
+
+    .shadow-toggle label {
+        font-size: 11px;
+        gap: 4px;
+    }
+
+    #reset-scene {
+        padding: 5px 8px;
+        font-size: 11px;
+    }
+
+    /* Toolbar: let tool groups, hints, and copyright wrap to multiple rows. */
+    #toolbar {
+        gap: 8px 10px;
+        padding: 6px 10px;
+        flex-wrap: wrap;
+        align-content: center;
+    }
+
+    .camera-controls-hint {
+        font-size: 12px;
+        padding: 4px 10px;
+        gap: 12px;
+    }
+
+    .tool-group {
+        gap: 3px;
+        padding: 4px;
+    }
+
+    .tool-group-tag {
+        display: none;
+    }
+
+    .tool-btn {
+        width: 38px;
+        height: 38px;
+    }
+
+    .tool-icon {
+        font-size: 16px;
+    }
+
+    /* Condense panel chrome and contents to ~66% to fit narrow drawers. */
+    .panel-header {
+        padding: 8px 10px;
+    }
+
+    .panel-header h3 {
+        font-size: 10px;
+    }
+
+    .panel-content {
+        padding: 5px;
+    }
+
+    .btn-add {
+        height: 20px;
+        padding: 0 6px;
+        font-size: 9px;
+    }
+
+    .scene-item {
+        padding: 5px 7px;
+        gap: 6px;
+    }
+
+    .scene-item .icon {
+        font-size: 11px;
+        width: 14px;
+    }
+
+    .scene-item .name,
+    .scene-item .visibility {
+        font-size: 10px;
+    }
+
+    .add-menu {
+        padding: 5px;
+    }
+
+    .add-menu-section h4 {
+        font-size: 9px;
+    }
+
+    .add-item {
+        padding: 5px 7px;
+        gap: 6px;
+        font-size: 10px;
+    }
+
+    .add-item .icon {
+        font-size: 11px;
+        width: 14px;
+    }
+
+    .property-section {
+        margin-bottom: 10px;
+    }
+
+    .property-section-header {
+        padding: 5px 0;
+        margin-bottom: 6px;
+    }
+
+    .property-section-header h4 {
+        font-size: 9px;
+    }
+
+    .property-row {
+        grid-template-columns: 55px 1fr;
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .property-row label {
+        font-size: 9px;
+    }
+
+    .property-row input[type="text"],
+    .property-row input[type="number"] {
+        padding: 5px 6px;
+        font-size: 10px;
+        min-height: 24px;
+    }
+
+    .vector-input {
+        gap: 4px;
+    }
+
+    .vector-input input[type="number"] {
+        padding: 5px 18px 5px 16px;
+        min-height: 24px;
+    }
+
+    .color-picker-wrapper input[type="color"] {
+        width: 22px;
+        height: 18px;
+    }
+
+    .color-hex {
+        font-size: 9px;
+    }
+
+    .slider-row .value {
+        font-size: 9px;
+        min-width: 28px;
+    }
+
+    .name-input {
+        padding: 4px 6px;
+        font-size: 9px;
+    }
+
+    /* Copyright and source links in footer: shrunk from 14px, but not as tight as the panels. */
+    .footer-right {
+        font-size: 11px;
+    }
+
+    .footer-right .repo-link img {
+        height: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --toolbar-height: 180px;
+    }
+
+    .tool-btn {
+        width: 34px;
+        height: 34px;
+    }
+
+    .shadow-toggle label {
+        font-size: 0;
+        gap: 0;
+    }
+
+    .shadow-toggle input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+    }
 }

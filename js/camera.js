@@ -221,19 +221,26 @@ export class OrbitControls {
     touchStartDistance = 0;
 
     onTouchStart(e) {
+        if (!this.enabled) return;
         e.preventDefault();
         if (e.touches.length === 1) {
             this.isDragging = true;
             this.lastX = e.touches[0].clientX;
             this.lastY = e.touches[0].clientY;
         } else if (e.touches.length === 2) {
+            // Two fingers: pinch-to-zoom AND midpoint-translate-to-pan run
+            // simultaneously. Rotation is disabled while two fingers are down.
             this.isDragging = false;
             this.touchStartDist = this.getTouchDistance(e.touches);
             this.touchStartDistance = this.targetDistance;
+            const mid = this.getTouchMidpoint(e.touches);
+            this.lastX = mid.x;
+            this.lastY = mid.y;
         }
     }
 
     onTouchMove(e) {
+        if (!this.enabled) return;
         e.preventDefault();
         if (e.touches.length === 1 && this.isDragging) {
             const dx = e.touches[0].clientX - this.lastX;
@@ -248,6 +255,8 @@ export class OrbitControls {
                 this.maxPhi
             );
         } else if (e.touches.length === 2) {
+            // Pinch: zoom is absolute against the start distance so momentary
+            // finger wobble doesn't accumulate error.
             const dist = this.getTouchDistance(e.touches);
             const scale = this.touchStartDist / dist;
             this.targetDistance = clamp(
@@ -255,17 +264,43 @@ export class OrbitControls {
                 this.minDistance,
                 this.maxDistance
             );
+            // Pan: midpoint delta since last move. Independent of pinch, so a
+            // pure spread has no pan, a pure translate has no zoom, and mixed
+            // gestures apply both naturally. Sign is flipped relative to the
+            // desktop mouse pan: touch expects grab-and-drag (the scene
+            // follows the fingers), not camera-follows-cursor.
+            const mid = this.getTouchMidpoint(e.touches);
+            const dx = mid.x - this.lastX;
+            const dy = mid.y - this.lastY;
+            this.lastX = mid.x;
+            this.lastY = mid.y;
+            this.pan(dx, dy);
         }
     }
 
     onTouchEnd(e) {
-        this.isDragging = false;
+        // A finger lift can drop us from 2 touches back to 1: re-seed the
+        // single-finger rotate baseline so the remaining finger doesn't jump.
+        if (e.touches.length === 1) {
+            this.isDragging = true;
+            this.lastX = e.touches[0].clientX;
+            this.lastY = e.touches[0].clientY;
+        } else {
+            this.isDragging = false;
+        }
     }
 
     getTouchDistance(touches) {
         const dx = touches[0].clientX - touches[1].clientX;
         const dy = touches[0].clientY - touches[1].clientY;
         return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    getTouchMidpoint(touches) {
+        return {
+            x: (touches[0].clientX + touches[1].clientX) / 2,
+            y: (touches[0].clientY + touches[1].clientY) / 2
+        };
     }
 
     pan(dx, dy) {

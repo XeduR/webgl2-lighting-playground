@@ -46,11 +46,17 @@
 <body>
     <div id="app">
         <canvas id="gl-canvas"></canvas>
+        <div id="panel-backdrop"></div>
+
+        <!-- Mobile viewport warning (hidden on desktop, dismissible) -->
+        <div id="small-viewport-banner" role="alert">
+            <span>This playground works best on a desktop.</span>
+            <button id="dismiss-viewport-banner" aria-label="Dismiss banner">&times;</button>
+        </div>
 
         <!-- Top Bar -->
         <header id="top-bar">
             <div class="logo">
-                <span class="logo-icon">◈</span>
                 <span class="logo-text">WebGL2 Lighting Playground</span>
             </div>
             <div class="top-controls">
@@ -77,6 +83,10 @@
             </div>
         </header>
 
+        <!-- Panel toggle buttons (shared desktop and mobile) -->
+        <button id="btn-toggle-left" class="panel-toggle panel-toggle-left" title="Hide left panel" aria-label="Toggle left panel">&#x25C0;&#xFE0E;</button>
+        <button id="btn-toggle-right" class="panel-toggle panel-toggle-right" title="Hide right panel" aria-label="Toggle right panel">&#x25B6;&#xFE0E;</button>
+
         <!-- Left Panel: Scene Hierarchy -->
         <aside id="left-panel" class="panel">
             <div class="panel-header">
@@ -99,7 +109,7 @@
                     <div class="add-menu-section">
                         <h4>Lights</h4>
                         <button data-type="directional" class="add-item">
-                            <span class="icon">☀</span> Directional
+                            <span class="icon">&#x2600;&#xFE0E;</span> Directional
                         </button>
                         <button data-type="point" class="add-item">
                             <span class="icon">●</span> Point Light
@@ -127,8 +137,6 @@
 
         <!-- Bottom Toolbar -->
         <footer id="toolbar">
-            <span class="footer-left">Yes, there are bugs and issues.<br>No, I don't plan on fixing them.</span>
-
             <div class="tool-group">
                 <span class="tool-group-tag">Object</span>
                 <button id="tool-select" class="tool-btn active" title="Select (Q)">
@@ -160,10 +168,10 @@
                     <span class="tool-icon">↷</span>
                 </button>
             </div>
-            <div class="camera-controls-hint">
-                <span>🖱️ Left drag: Orbit</span>
-                <span>🖱️ Right drag: Pan</span>
-                <span>⚙️ Scroll: Zoom</span>
+            <div class="camera-controls-hint" id="camera-controls-hint">
+                <span>Left drag: Orbit</span>
+                <span>Right drag: Pan</span>
+                <span>Scroll: Zoom</span>
             </div>
 
             <span class="footer-right">

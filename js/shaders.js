@@ -639,6 +639,8 @@ void main() {
 `;
 
 // Gizmo shaders
+// uNdcOffset lets the tool controller draw the gizmo multiple times with small
+// screen-space offsets, faking thicker lines (WebGL2 clamps gl.lineWidth to 1).
 export const GIZMO_VERTEX_SHADER = `#version 300 es
 precision highp float;
 in vec3 aPosition;
@@ -646,10 +648,13 @@ in vec3 aColor;
 uniform mat4 uViewMatrix;
 uniform mat4 uProjectionMatrix;
 uniform mat4 uModelMatrix;
+uniform vec2 uNdcOffset;
 out vec3 vColor;
 void main() {
     vColor = aColor;
-    gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(aPosition, 1.0);
+    vec4 pos = uProjectionMatrix * uViewMatrix * uModelMatrix * vec4(aPosition, 1.0);
+    pos.xy += uNdcOffset * pos.w;
+    gl_Position = pos;
 }
 `;
 
