@@ -446,9 +446,11 @@ export const mat4 = {
         if (!det) return null;
         det = 1.0 / det;
 
-        out[0] = b00 * det; out[1] = b10 * det; out[2] = b20 * det;
-        out[3] = b01 * det; out[4] = b11 * det; out[5] = b21 * det;
-        out[6] = b02 * det; out[7] = b12 * det; out[8] = b22 * det;
+        // Normal matrix is (M^-1)^T. adj(M) = C^T so M^-1 = C^T/det, and (M^-1)^T = C/det.
+        // Store C/det column-major: out[col*3+row] = C[row][col]/det = b[row][col]/det.
+        out[0] = b00 * det; out[1] = b01 * det; out[2] = b02 * det;
+        out[3] = b10 * det; out[4] = b11 * det; out[5] = b12 * det;
+        out[6] = b20 * det; out[7] = b21 * det; out[8] = b22 * det;
 
         return out;
     }

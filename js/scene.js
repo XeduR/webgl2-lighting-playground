@@ -54,22 +54,7 @@ export class Transform {
         mat4.rotateZ(this.modelMatrix, this.modelMatrix, this.rotation[2]);
         mat4.scale(this.modelMatrix, this.modelMatrix, this.scale);
 
-        // Calculate normal matrix
-        if (this.ignoreRotationForNormals) {
-            // For spheres: normal matrix is inverse of scale only.
-            // Rotation shouldn't affect normals on a rotationally symmetric shape.
-            this.normalMatrix[0] = 1 / this.scale[0];
-            this.normalMatrix[1] = 0;
-            this.normalMatrix[2] = 0;
-            this.normalMatrix[3] = 0;
-            this.normalMatrix[4] = 1 / this.scale[1];
-            this.normalMatrix[5] = 0;
-            this.normalMatrix[6] = 0;
-            this.normalMatrix[7] = 0;
-            this.normalMatrix[8] = 1 / this.scale[2];
-        } else {
-            mat4.normalFromMat4(this.normalMatrix, this.modelMatrix);
-        }
+        mat4.normalFromMat4(this.normalMatrix, this.modelMatrix);
 
         this.dirty = false;
     }
@@ -114,11 +99,6 @@ export class SceneObject {
         this.visible = true;
         this.castShadow = true;
         this.receiveShadow = true;
-
-        // Sphere normals should ignore rotation (rotationally symmetric)
-        if (geometryType === 'sphere') {
-            this.transform.ignoreRotationForNormals = true;
-        }
     }
 
     clone() {
@@ -126,7 +106,6 @@ export class SceneObject {
         vec3.copy(obj.transform.position, this.transform.position);
         vec3.copy(obj.transform.rotation, this.transform.rotation);
         vec3.copy(obj.transform.scale, this.transform.scale);
-        obj.transform.ignoreRotationForNormals = this.transform.ignoreRotationForNormals;
         obj.transform.dirty = true;
         obj.material = this.material.clone();
         obj.visible = this.visible;
