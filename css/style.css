@@ -846,3 +846,49 @@ body {
     color: #ffffff;
     text-decoration: underline;
 }
+
+/* === Overlay Dialogs (errors, warnings) === */
+
+.overlay-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-panel);
+    padding: 24px 32px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-medium);
+    font-family: var(--font-mono);
+    text-align: center;
+    z-index: 1000;
+    max-width: 500px;
+    box-shadow: var(--shadow-lg);
+}
+
+.overlay-dialog h2 {
+    margin: 0 0 12px 0;
+    font-size: 1rem;
+}
+
+.overlay-dialog p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.overlay-dialog .hint {
+    margin-top: 16px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.overlay-dialog.error {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.overlay-dialog.warning {
+    border-color: var(--warning);
+    color: var(--warning);
+    cursor: pointer;
+}

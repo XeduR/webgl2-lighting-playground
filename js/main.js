@@ -66,6 +66,14 @@ class Application {
             // Start render loop
             this.start();
 
+            // Show warning if recovering from a quality-change crash
+            if (this.renderer.crashRecovery) {
+                this.showWarning(
+                    `Your device doesn't have enough GPU memory for "${this.renderer.crashRecovery}" quality. ` +
+                    `Reverted to "${this.renderer.quality}".`
+                );
+            }
+
             console.log('WebGL2 Lighting Playground initialized successfully');
 
         } catch (error) {
@@ -129,39 +137,38 @@ class Application {
         requestAnimationFrame((t) => this.loop(t));
     }
 
+    createOverlay(type, title, message, hint) {
+        const div = document.createElement('div');
+        div.className = `overlay-dialog ${type}`;
+
+        const h2 = document.createElement('h2');
+        h2.textContent = title;
+
+        const p = document.createElement('p');
+        p.textContent = message;
+
+        const small = document.createElement('p');
+        small.className = 'hint';
+        small.textContent = hint;
+
+        div.append(h2, p, small);
+        document.body.appendChild(div);
+        return div;
+    }
+
     showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #1a1a2e;
-            color: #ef4444;
-            padding: 24px 32px;
-            border-radius: 8px;
-            border: 1px solid #ef4444;
-            font-family: 'JetBrains Mono', monospace;
-            text-align: center;
-            z-index: 1000;
-            max-width: 500px;
-        `;
-        const heading = document.createElement('h2');
-        heading.style.cssText = 'margin: 0 0 12px 0; font-size: 18px;';
-        heading.textContent = 'WebGL2 Error';
+        this.createOverlay(
+            'error', 'WebGL2 Error', message,
+            'Please ensure your browser supports WebGL2 and hardware acceleration is enabled.'
+        );
+    }
 
-        const msg = document.createElement('p');
-        msg.style.cssText = 'margin: 0; font-size: 14px; color: #ccc;';
-        msg.textContent = message;
-
-        const hint = document.createElement('p');
-        hint.style.cssText = 'margin: 16px 0 0 0; font-size: 12px; color: #888;';
-        hint.textContent = 'Please ensure your browser supports WebGL2 and hardware acceleration is enabled.';
-
-        errorDiv.appendChild(heading);
-        errorDiv.appendChild(msg);
-        errorDiv.appendChild(hint);
-        document.body.appendChild(errorDiv);
+    showWarning(message) {
+        const div = this.createOverlay(
+            'warning', 'GPU Memory Warning', message,
+            'Tap anywhere to dismiss.'
+        );
+        div.addEventListener('click', () => div.remove());
     }
 }
 

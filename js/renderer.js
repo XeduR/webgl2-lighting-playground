@@ -53,9 +53,28 @@ export class Renderer {
 
         this.capabilities = getGLCapabilities(this.gl);
 
-        this.quality = "high";
-        this.softShadows = true;
+        this.isMobile = window.mobileCheck();
+
+        // Check if a previous quality change crashed the page
+        const crashData = sessionStorage.getItem("webgl-quality-attempt");
+        if (crashData) {
+            sessionStorage.removeItem("webgl-quality-attempt");
+            const parsed = JSON.parse(crashData);
+            this.quality = parsed.safe;
+            this.crashRecovery = parsed.attempted;
+        } else {
+            this.quality = this.isMobile ? "low" : "high";
+            this.crashRecovery = null;
+        }
+        this.softShadows = !this.isMobile;
         this.transmissionEnabled = true;
+
+        // Clamp quality to what the GPU can actually handle
+        this.availablePresets = this.getAvailablePresets();
+        if (!this.availablePresets[this.quality]) {
+            const names = Object.keys(QualityPresets).reverse();
+            this.quality = names.find(n => this.availablePresets[n]) || "low";
+        }
 
         this.programs = {};
         this.geometryCache = null;
@@ -404,13 +423,57 @@ export class Renderer {
         return { vao, vb, ib };
     }
 
+    // Check which quality presets are feasible on this GPU.
+    // Uses MAX_TEXTURE_SIZE for hard dimension limits and conservative memory
+    // budgets per device class (WebGL has no API to query actual GPU memory).
+    getAvailablePresets() {
+        const maxTexSize = this.capabilities.maxTextureSize;
+        const available = {};
+        for (const [name, preset] of Object.entries(QualityPresets)) {
+            const size = preset.shadowMapSize;
+            // Point shadow atlas is faceSize*3 wide by faceSize*2 tall
+            const fitsTexture = size * 3 <= maxTexSize && size * 2 <= maxTexSize;
+            // On mobile, also apply a 256MB memory budget (no GPU memory query in WebGL).
+            // Desktop relies on MAX_TEXTURE_SIZE + sessionStorage crash recovery instead,
+            // since there's no way to distinguish a gaming GPU from integrated graphics.
+            const fitsMemory = !this.isMobile || size * size * 240 <= 268435456;
+            available[name] = fitsTexture && fitsMemory;
+        }
+        return available;
+    }
+
     setQuality(preset) {
         if (this.quality === preset) return;
+        if (!this.availablePresets[preset]) return;
+
+        // Bookmark the last confirmed-safe quality before attempting the change.
+        // If the new allocation crashes the page, the reload finds this flag
+        // and reverts to the safe quality with a warning.
+        const existing = sessionStorage.getItem("webgl-quality-attempt");
+        if (!existing) {
+            sessionStorage.setItem("webgl-quality-attempt", JSON.stringify({
+                attempted: preset, safe: this.quality
+            }));
+        } else {
+            // Rapid changes: keep the original safe quality, update the target
+            const parsed = JSON.parse(existing);
+            parsed.attempted = preset;
+            sessionStorage.setItem("webgl-quality-attempt", JSON.stringify(parsed));
+        }
+
         this.quality = preset;
         this.transmissionEnabled = QualityPresets[preset].transmissionEnabled;
         if (this.currentShadowMapSize !== QualityPresets[preset].shadowMapSize) {
             this.createShadowResources(4, 2);
         }
+
+        // Survived allocation. Clear the flag after two frames to confirm the
+        // GPU can render with these resources without crashing.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                sessionStorage.removeItem("webgl-quality-attempt");
+            });
+        });
     }
 
     resize(width, height) {

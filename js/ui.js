@@ -32,6 +32,19 @@ export class UIController {
         this.setupSceneCallbacks();
         this.refreshSceneList();
         this.updateUndoRedoState();
+
+        // Sync UI controls with renderer state (quality may differ from HTML defaults on mobile)
+        const qualitySelect = document.getElementById('quality-preset');
+        qualitySelect.value = this.renderer.quality;
+        document.getElementById('soft-shadows').checked = this.renderer.softShadows;
+
+        // Disable quality presets that exceed this device's GPU capabilities
+        const available = this.renderer.availablePresets;
+        for (const option of qualitySelect.options) {
+            if (!available[option.value]) {
+                option.disabled = true;
+            }
+        }
     }
 
     setupEventListeners() {
