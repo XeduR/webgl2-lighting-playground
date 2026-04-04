@@ -81,6 +81,11 @@ export class UIController {
         document.getElementById('delete-btn').addEventListener('click', () => this.deleteSelected());
         document.getElementById('duplicate-btn').addEventListener('click', () => this.duplicateSelected());
         document.getElementById('reset-scene').addEventListener('click', () => this.resetScene());
+        document.getElementById('reset-camera-btn').addEventListener('click', () => {
+            if (this.controls && this.controls.reset) {
+                this.controls.reset();
+            }
+        });
 
         // Quality preset
         document.getElementById('quality-preset').addEventListener('change', (e) => {
