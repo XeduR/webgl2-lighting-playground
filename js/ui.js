@@ -4,6 +4,7 @@
 
 import { vec3, hexToRgb, rgbToHex, degToRad, radToDeg } from './math.js';
 import { SceneObject, Light, LightType, createDefaultScene } from './scene.js';
+import { ICONS } from './icons.js';
 
 // Escape HTML entities to prevent injection via innerHTML
 const escHTML = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -449,39 +450,65 @@ export class UIController {
         const item = document.createElement('li');
         item.className = 'scene-item';
         item.dataset.id = entity.id;
+        item.tabIndex = 0;
+        item.setAttribute('role', 'option');
+        const isSelected = this.scene.selectedEntity === entity;
+        item.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+
+        const eyeIcon = entity.visible ? ICONS.eye : ICONS.eyeOff;
 
         if (entity.type === 'object') {
             item.classList.add('object');
-            const icons = { cube: '□', sphere: '○', plane: '▭' };
+            const icons = { cube: ICONS.cube, sphere: ICONS.sphere, plane: ICONS.plane };
             item.innerHTML = `
-                <span class="icon">${icons[entity.geometryType] || '■'}</span>
+                <span class="icon">${icons[entity.geometryType] || ICONS.cube}</span>
                 <span class="name">${escHTML(entity.name)}</span>
-                <span class="visibility">${entity.visible ? '\u{1F441}\uFE0E' : '○'}</span>
+                <button type="button" class="visibility" aria-label="Toggle visibility" aria-pressed="${entity.visible}">${eyeIcon}</button>
             `;
         } else {
             const typeClass = `light-${entity.lightType}`;
             item.classList.add(typeClass);
-            const icons = { directional: '\u2600\uFE0E', point: '●', spot: '◎' };
+            const icons = { directional: ICONS.directional, point: ICONS.point, spot: ICONS.spot };
             item.innerHTML = `
-                <span class="icon">${icons[entity.lightType] || '★'}</span>
+                <span class="icon">${icons[entity.lightType] || ICONS.star}</span>
                 <span class="name">${escHTML(entity.name)}</span>
-                <span class="visibility">${entity.visible ? '\u{1F441}\uFE0E' : '○'}</span>
+                <button type="button" class="visibility" aria-label="Toggle visibility" aria-pressed="${entity.visible}">${eyeIcon}</button>
             `;
         }
 
-        if (this.scene.selectedEntity === entity) {
+        if (isSelected) {
             item.classList.add('selected');
         }
 
-        // Click to select
+        // Selecting rebuilds the list, so re-focus the rebuilt row for keyboard users.
+        const selectAndKeepFocus = () => {
+            this.scene.selectEntity(entity);
+            const rebuilt = this.sceneList.querySelector(`[data-id="${entity.id}"]`);
+            if (rebuilt) rebuilt.focus({ preventScroll: true });
+        };
+
+        // Click selects, unless it landed on the visibility button.
         item.addEventListener('click', (e) => {
-            if (e.target.classList.contains('visibility')) {
-                entity.visible = !entity.visible;
-                this.refreshSceneList();
-            } else {
-                this.scene.selectEntity(entity);
-                this.refreshSceneList();
+            if (e.target.closest('.visibility')) return;
+            this.scene.selectEntity(entity);
+            this.refreshSceneList();
+        });
+
+        // WCAG 2.1.1: Enter/Space activate selection from the keyboard.
+        item.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectAndKeepFocus();
             }
+        });
+
+        // Visibility toggle as a real, focusable button.
+        const visBtn = item.querySelector('.visibility');
+        visBtn.addEventListener('click', () => {
+            entity.visible = !entity.visible;
+            this.refreshSceneList();
+            const rebuilt = this.sceneList.querySelector(`[data-id="${entity.id}"] .visibility`);
+            if (rebuilt) rebuilt.focus({ preventScroll: true });
         });
 
         return item;
@@ -514,7 +541,7 @@ export class UIController {
         this.propertiesContent.innerHTML = `
             <div class="property-section">
                 <div class="property-section-header">
-                    <h4>Properties</h4>
+                    <h3>General</h3>
                 </div>
 
                 <div class="property-row">
@@ -525,7 +552,7 @@ export class UIController {
 
             <div class="property-section">
                 <div class="property-section-header">
-                    <h4>Transform</h4>
+                    <h3>Transform</h3>
                 </div>
 
                 <div class="property-row">
@@ -558,7 +585,7 @@ export class UIController {
 
             <div class="property-section">
                 <div class="property-section-header">
-                    <h4>Material</h4>
+                    <h3>Material</h3>
                 </div>
 
                 <div class="property-row">
@@ -604,7 +631,7 @@ export class UIController {
 
             <div class="property-section">
                 <div class="property-section-header">
-                    <h4>Shadows</h4>
+                    <h3>Shadows</h3>
                 </div>
 
                 ${!isGround ? `
@@ -618,10 +645,10 @@ export class UIController {
             ${!isGround ? `
             <div class="property-section remove-section">
                 <div class="property-section-header">
-                    <h4>Remove</h4>
+                    <h3>Remove</h3>
                 </div>
                 <div class="property-row">
-                    <span class="remove-link" data-action="remove">Remove object</span>
+                    <button type="button" class="remove-link" data-action="remove">Remove object</button>
                 </div>
             </div>
             ` : ''}
@@ -676,7 +703,7 @@ export class UIController {
         this.propertiesContent.innerHTML = `
             <div class="property-section">
                 <div class="property-section-header">
-                    <h4>Properties</h4>
+                    <h3>General</h3>
                 </div>
 
                 <div class="property-row">
@@ -687,7 +714,7 @@ export class UIController {
 
             <div class="property-section">
                 <div class="property-section-header">
-                    <h4>Transform</h4>
+                    <h3>Transform</h3>
                 </div>
 
                 ${light.lightType !== LightType.DIRECTIONAL ? `
@@ -715,7 +742,7 @@ export class UIController {
 
             <div class="property-section">
                 <div class="property-section-header">
-                    <h4>Light</h4>
+                    <h3>Light</h3>
                 </div>
 
                 <div class="property-row">
@@ -739,7 +766,7 @@ export class UIController {
 
             <div class="property-section">
                 <div class="property-section-header">
-                    <h4>Shadows</h4>
+                    <h3>Shadows</h3>
                 </div>
 
                 <div class="property-row">
@@ -758,15 +785,27 @@ export class UIController {
 
             <div class="property-section remove-section">
                 <div class="property-section-header">
-                    <h4>Remove</h4>
+                    <h3>Remove</h3>
                 </div>
                 <div class="property-row">
-                    <span class="remove-link" data-action="remove">Remove light</span>
+                    <button type="button" class="remove-link" data-action="remove">Remove light</button>
                 </div>
             </div>
         `;
 
         this.bindLightPropertyEvents(light);
+    }
+
+    // Give each property control an accessible name from its row's <label>.
+    labelRowControls() {
+        this.propertiesContent.querySelectorAll('.property-row').forEach(row => {
+            const label = row.querySelector('label');
+            if (!label) return;
+            const text = label.textContent.trim();
+            row.querySelectorAll('input, select').forEach(ctrl => {
+                if (!ctrl.hasAttribute('aria-label')) ctrl.setAttribute('aria-label', text);
+            });
+        });
     }
 
     bindObjectPropertyEvents(obj) {
@@ -894,6 +933,8 @@ export class UIController {
                 obj[prop] = e.target.checked;
             });
         });
+
+        this.labelRowControls();
     }
 
     bindLightPropertyEvents(light) {
@@ -1048,10 +1089,16 @@ export class UIController {
                 light[prop] = e.target.checked;
             });
         });
+
+        this.labelRowControls();
     }
 
     updateStats(fps, drawCalls) {
-        document.getElementById('fps-counter').textContent = `${fps} FPS`;
+        const fpsEl = document.getElementById('fps-counter');
+        fpsEl.textContent = `${fps} FPS`;
+        // Color reflects health: green >=50, amber 30-49, red <30.
+        fpsEl.classList.toggle('fps-ok', fps >= 30 && fps < 50);
+        fpsEl.classList.toggle('fps-bad', fps < 30);
         document.getElementById('draw-calls').textContent = `${drawCalls} draws`;
     }
 }

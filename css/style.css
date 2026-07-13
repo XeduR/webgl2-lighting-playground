@@ -11,7 +11,7 @@
 
     --text-primary: #e8e8ec;
     --text-secondary: #9898a8;
-    --text-muted: #686878;
+    --text-muted: #808090; /* was #686878, which failed WCAG AA on panel labels/stats */
 
     --accent-primary: #6366f1;
     --accent-secondary: #8b5cf6;
@@ -25,6 +25,11 @@
     --light-point: #60a5fa;
     --light-spot: #a78bfa;
 
+    /* Transform gizmo axes (brighter than danger/success/one-off blue for AA). */
+    --axis-x: #f87171;
+    --axis-y: #22c55e;
+    --axis-z: #60a5fa;
+
     --font-mono: 'JetBrains Mono', monospace;
     --font-sans: 'Space Grotesk', sans-serif;
 
@@ -34,6 +39,7 @@
     --topbar-height: 44px;
     --banner-height: 0px;
 
+    --radius-xs: 2px;
     --radius-sm: 4px;
     --radius-md: 6px;
     --radius-lg: 8px;
@@ -41,6 +47,9 @@
     --shadow-sm: 0 2px 4px rgba(0,0,0,0.3);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
     --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+
+    /* Directional drawer shadow: shared blur+color, per-side offset applied inline. */
+    --shadow-drawer: 20px rgba(0, 0, 0, 0.55);
 }
 
 /* === Reset & Base === */
@@ -61,6 +70,31 @@ body {
     color: var(--text-primary);
     background: var(--bg-dark);
     line-height: 1.5;
+}
+
+/* Unified keyboard focus ring; individual :focus rules strip the UA outline. */
+:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Inline SVG icons size to the host font-size (1em) and align to the text baseline. */
+.tool-icon svg,
+.scene-item .icon svg,
+.add-item .icon svg,
+.scene-item .visibility svg,
+.panel-toggle svg {
+    display: inline-block;
+    vertical-align: middle;
 }
 
 /* === Layout === */
@@ -101,8 +135,15 @@ body {
     display: none;
 }
 
-#gl-canvas {
+#viewport {
     grid-area: canvas;
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+}
+
+#gl-canvas {
     width: 100%;
     height: 100%;
     max-width: 100%;
@@ -207,6 +248,15 @@ body {
     color: var(--success);
 }
 
+/* FPS color reflects the frame rate (class set in updateStats). */
+#fps-counter.fps-ok {
+    color: var(--warning);
+}
+
+#fps-counter.fps-bad {
+    color: var(--danger);
+}
+
 /* === Panels === */
 .panel {
     background: var(--bg-panel);
@@ -235,8 +285,8 @@ body {
     background: var(--bg-panel-alt);
 }
 
-.panel-header h3 {
-    font-size: 12px;
+.panel-header h2 {
+    font-size: 15px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -276,7 +326,7 @@ body {
     margin-bottom: 0;
 }
 
-.add-menu-section h4 {
+.add-menu-section h3 {
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -356,12 +406,23 @@ body {
 }
 
 .scene-item .visibility {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: inherit;
     opacity: 0.5;
     font-size: 12px;
     cursor: pointer;
+    line-height: 1;
+    /* Expand the tap target without shifting the glyph. */
+    padding: 8px;
+    margin: -8px;
 }
 
-.scene-item .visibility:hover {
+.scene-item .visibility:hover,
+.scene-item .visibility:focus-visible {
     opacity: 1;
 }
 
@@ -390,7 +451,7 @@ body {
     margin-bottom: 10px;
 }
 
-.property-section-header h4 {
+.property-section-header h3 {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -399,7 +460,7 @@ body {
 
 .property-row {
     display: grid;
-    grid-template-columns: 80px 1fr;
+    grid-template-columns: 80px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
     margin-bottom: 8px;
@@ -441,6 +502,13 @@ body {
     border-color: var(--accent-primary);
 }
 
+/* Keyboard focus needs a ring the color-only border swap does not provide. */
+.property-row input:focus-visible,
+.name-input:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 1px;
+}
+
 .vector-input {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -468,11 +536,6 @@ body {
     cursor: pointer;
 }
 
-/* Direct inputs without wrapper (fallback) */
-.vector-input > input:nth-child(1) { border-left: 2px solid #ef4444; }
-.vector-input > input:nth-child(2) { border-left: 2px solid #22c55e; }
-.vector-input > input:nth-child(3) { border-left: 2px solid #3b82f6; }
-
 /* Axis input wrapper with label */
 .axis-input {
     display: flex;
@@ -488,19 +551,18 @@ body {
     left: 8px;
     font-size: 10px;
     font-weight: 700;
-    opacity: 0.9;
     text-transform: uppercase;
     pointer-events: none;
     z-index: 1;
 }
 
-.axis-input.axis-x { border-left: 3px solid #ef4444; }
-.axis-input.axis-y { border-left: 3px solid #22c55e; }
-.axis-input.axis-z { border-left: 3px solid #3b82f6; }
+.axis-input.axis-x { border-left: 3px solid var(--axis-x); }
+.axis-input.axis-y { border-left: 3px solid var(--axis-y); }
+.axis-input.axis-z { border-left: 3px solid var(--axis-z); }
 
-.axis-input.axis-x .axis-label { color: #ef4444; }
-.axis-input.axis-y .axis-label { color: #22c55e; }
-.axis-input.axis-z .axis-label { color: #3b82f6; }
+.axis-input.axis-x .axis-label { color: var(--axis-x); }
+.axis-input.axis-y .axis-label { color: var(--axis-y); }
+.axis-input.axis-z .axis-label { color: var(--axis-z); }
 
 .color-picker-wrapper {
     display: flex;
@@ -524,7 +586,11 @@ body {
 
 .color-picker-wrapper input[type="color"]::-webkit-color-swatch {
     border: none;
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
+}
+
+.color-picker-wrapper input[type="color"]:hover {
+    border-color: var(--border-medium);
 }
 
 .color-hex {
@@ -538,14 +604,16 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
 }
 
 .slider-row input[type="range"] {
     flex: 1;
+    min-width: 0;
     height: 4px;
     -webkit-appearance: none;
     background: var(--bg-panel-alt);
-    border-radius: 2px;
+    border-radius: var(--radius-xs);
 }
 
 .slider-row input[type="range"]::-webkit-slider-thumb {
@@ -555,6 +623,10 @@ body {
     background: var(--accent-primary);
     border-radius: 50%;
     cursor: pointer;
+}
+
+.slider-row input[type="range"]::-webkit-slider-thumb:hover {
+    background: var(--accent-secondary);
 }
 
 .slider-row .value {
@@ -602,7 +674,7 @@ body {
 
 .tool-group-tag {
     font-size: 10px;
-    color: #ffffff;
+    color: var(--text-primary);
     letter-spacing: 0.5px;
     text-transform: uppercase;
     white-space: nowrap;
@@ -644,7 +716,7 @@ body {
 
 .tool-btn.tool-disabled,
 .tool-btn.tool-disabled:hover {
-    opacity: 0.25;
+    opacity: 0.4;
     cursor: not-allowed;
     background: transparent;
     color: var(--text-muted);
@@ -661,13 +733,13 @@ body {
     padding: 10px 16px;
     background: var(--bg-panel-alt);
     border-radius: var(--radius-md);
-    font-size: 16px;
+    font-size: 12px;
     color: var(--text-secondary);
 }
 
 .camera-controls-hint span {
     white-space: nowrap;
-    color: #ffffff;
+    color: var(--text-secondary);
 }
 
 /* === Buttons === */
@@ -683,15 +755,7 @@ body {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s;
-}
-
-.btn-primary {
-    background: var(--accent-primary);
-    color: white;
-}
-
-.btn-primary:hover {
-    background: var(--accent-secondary);
+    white-space: nowrap;
 }
 
 .btn-secondary {
@@ -703,23 +767,6 @@ body {
 .btn-secondary:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
-}
-
-.btn-icon {
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    background: var(--bg-panel-alt);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    font-size: 16px;
-    cursor: pointer;
-}
-
-.btn-icon:hover {
-    background: var(--accent-primary);
-    border-color: var(--accent-primary);
 }
 
 .btn-add {
@@ -752,21 +799,11 @@ body {
 
 ::-webkit-scrollbar-thumb {
     background: var(--border-medium);
-    border-radius: 3px;
+    border-radius: var(--radius-xs);
 }
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
-}
-
-/* === Selection Highlight Animation === */
-@keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
-    50% { box-shadow: 0 0 8px 2px var(--accent-glow); }
-}
-
-.scene-item.selected {
-    animation: pulse-glow 2s ease-in-out infinite;
 }
 
 /* === Name Input === */
@@ -793,7 +830,7 @@ body {
     padding-top: 8px;
 }
 
-.remove-section .property-section-header h4 {
+.remove-section .property-section-header h3 {
     color: var(--danger);
 }
 
@@ -802,8 +839,12 @@ body {
 }
 
 .remove-link {
+    background: none;
+    border: none;
+    padding: 0;
     color: var(--danger);
     cursor: pointer;
+    font-family: inherit;
     font-size: 12px;
     transition: opacity 0.15s ease;
     white-space: nowrap;
@@ -820,9 +861,9 @@ body {
 }
 
 .slider-hint {
-    font-size: 9px;
-    color: var(--text-muted);
-    opacity: 0.6;
+    grid-column: 1 / -1;
+    font-size: 11px;
+    color: var(--text-secondary);
     margin-top: 2px;
     font-style: italic;
 }
@@ -862,6 +903,14 @@ body {
 
 /* === Overlay Dialogs (errors, warnings) === */
 
+/* Full-screen dismiss layer behind the (dismissible) warning dialog. */
+.overlay-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1999;
+    background: rgba(0, 0, 0, 0.5);
+}
+
 .overlay-dialog {
     position: fixed;
     top: 50%;
@@ -873,25 +922,25 @@ body {
     border: 1px solid var(--border-medium);
     font-family: var(--font-mono);
     text-align: center;
-    z-index: 1000;
+    z-index: 2000;
     max-width: 500px;
     box-shadow: var(--shadow-lg);
 }
 
 .overlay-dialog h2 {
     margin: 0 0 12px 0;
-    font-size: 1rem;
+    font-size: 16px;
 }
 
 .overlay-dialog p {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 13px;
     color: var(--text-secondary);
 }
 
 .overlay-dialog .hint {
     margin-top: 16px;
-    font-size: 0.75rem;
+    font-size: 12px;
     color: var(--text-muted);
 }
 
@@ -917,7 +966,7 @@ body {
     padding: 8px 16px;
     background: rgba(239, 68, 68, 0.18);
     border-bottom: 1px solid var(--danger);
-    color: var(--danger);
+    color: #f87171; /* brighter than --danger to clear AA on the 18% tint at 12px */
     font-size: 12px;
     font-weight: 500;
     text-align: center;
@@ -946,6 +995,9 @@ body {
     top: calc((var(--banner-height) + var(--topbar-height) + 100vh - var(--toolbar-height)) / 2);
     transform: translateY(-50%);
     z-index: 25;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 26px;
     height: 56px;
     background: rgba(20, 21, 24, 0.92);
@@ -988,9 +1040,9 @@ body {
     display: block;
 }
 
-/* === Narrow screens (≤1400px): copyright drops to a second row before it collides with the camera-controls hint === */
+/* === Narrow screens (≤1560px): copyright drops to a second row before it collides with the camera-controls hint === */
 
-@media (max-width: 1400px) {
+@media (max-width: 1560px) {
     :root {
         --toolbar-height: 140px;
     }
@@ -1019,7 +1071,7 @@ body {
         --topbar-height: 44px;
         --banner-height: 56px; /* fits 2-line wrap on narrow phones */
         --mobile-left-width: min(172px, 68vw);
-        --mobile-right-width: min(212px, 72vw);
+        --mobile-right-width: min(260px, 82vw);
     }
 
     /* Drop grid columns for panels: canvas fills the content row */
@@ -1066,12 +1118,12 @@ body {
 
     #app:not(.left-collapsed) #left-panel {
         transform: translateX(0);
-        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.55);
+        box-shadow: 4px 0 var(--shadow-drawer);
     }
 
     #app:not(.right-collapsed) #right-panel {
         transform: translateX(0);
-        box-shadow: -4px 0 20px rgba(0, 0, 0, 0.55);
+        box-shadow: -4px 0 var(--shadow-drawer);
     }
 
     /* Toggle buttons: larger touch targets on mobile, track mobile panel widths. */
@@ -1136,7 +1188,7 @@ body {
     }
 
     .tool-group {
-        gap: 3px;
+        gap: 6px;
         padding: 4px;
     }
 
@@ -1145,8 +1197,8 @@ body {
     }
 
     .tool-btn {
-        width: 38px;
-        height: 38px;
+        width: 42px;
+        height: 42px;
     }
 
     .tool-icon {
@@ -1158,8 +1210,8 @@ body {
         padding: 8px 10px;
     }
 
-    .panel-header h3 {
-        font-size: 10px;
+    .panel-header h2 {
+        font-size: 12px;
     }
 
     .panel-content {
@@ -1191,8 +1243,8 @@ body {
         padding: 5px;
     }
 
-    .add-menu-section h4 {
-        font-size: 9px;
+    .add-menu-section h3 {
+        font-size: 11px;
     }
 
     .add-item {
@@ -1215,18 +1267,18 @@ body {
         margin-bottom: 6px;
     }
 
-    .property-section-header h4 {
-        font-size: 9px;
+    .property-section-header h3 {
+        font-size: 11px;
     }
 
     .property-row {
-        grid-template-columns: 55px 1fr;
+        grid-template-columns: 55px minmax(0, 1fr);
         gap: 6px;
         margin-bottom: 6px;
     }
 
     .property-row label {
-        font-size: 9px;
+        font-size: 11px;
     }
 
     .property-row input[type="text"],
@@ -1241,8 +1293,15 @@ body {
     }
 
     .vector-input input[type="number"] {
-        padding: 5px 18px 5px 16px;
+        min-width: 0;
+        padding: 5px 8px 5px 15px;
         min-height: 24px;
+    }
+
+    /* Native spinners are near-untappable in the narrow drawer; drop them. */
+    .vector-input input[type="number"]::-webkit-inner-spin-button,
+    .vector-input input[type="number"]::-webkit-outer-spin-button {
+        display: none;
     }
 
     .color-picker-wrapper input[type="color"] {
@@ -1251,17 +1310,17 @@ body {
     }
 
     .color-hex {
-        font-size: 9px;
+        font-size: 11px;
     }
 
     .slider-row .value {
-        font-size: 9px;
+        font-size: 11px;
         min-width: 28px;
     }
 
     .name-input {
         padding: 4px 6px;
-        font-size: 9px;
+        font-size: 11px;
     }
 
     /* Copyright and source links in footer: shrunk from 14px, but not as tight as the panels. */
@@ -1279,14 +1338,19 @@ body {
         --toolbar-height: 180px;
     }
 
+    /* Drop the logo so Reset Scene and the Soft Shadows label fit without wrapping. */
+    .logo-text {
+        display: none;
+    }
+
     .tool-btn {
-        width: 34px;
-        height: 34px;
+        width: 40px;
+        height: 40px;
     }
 
     .shadow-toggle label {
-        font-size: 0;
-        gap: 0;
+        font-size: 10px;
+        gap: 4px;
     }
 
     .shadow-toggle input[type="checkbox"] {

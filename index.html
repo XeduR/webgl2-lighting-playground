@@ -45,7 +45,9 @@
 </head>
 <body>
     <div id="app">
-        <canvas id="gl-canvas"></canvas>
+        <main id="viewport">
+            <canvas id="gl-canvas"></canvas>
+        </main>
         <div id="panel-backdrop"></div>
 
         <!-- Mobile viewport warning (hidden on desktop, dismissible) -->
@@ -57,7 +59,7 @@
         <!-- Top Bar -->
         <header id="top-bar">
             <div class="logo">
-                <span class="logo-text">WebGL2 Lighting Playground</span>
+                <h1 class="logo-text">WebGL2 Lighting Playground</h1>
             </div>
             <div class="top-controls">
                 <div class="quality-selector">
@@ -84,13 +86,13 @@
         </header>
 
         <!-- Panel toggle buttons (shared desktop and mobile) -->
-        <button id="btn-toggle-left" class="panel-toggle panel-toggle-left" title="Hide left panel" aria-label="Toggle left panel">&#x25C0;&#xFE0E;</button>
-        <button id="btn-toggle-right" class="panel-toggle panel-toggle-right" title="Hide right panel" aria-label="Toggle right panel">&#x25B6;&#xFE0E;</button>
+        <button id="btn-toggle-left" class="panel-toggle panel-toggle-left" title="Hide left panel" aria-label="Toggle left panel" data-icon="chevronLeft"></button>
+        <button id="btn-toggle-right" class="panel-toggle panel-toggle-right" title="Hide right panel" aria-label="Toggle right panel" data-icon="chevronRight"></button>
 
         <!-- Left Panel: Scene Hierarchy -->
         <aside id="left-panel" class="panel">
             <div class="panel-header">
-                <h3>Scene</h3>
+                <h2>Scene</h2>
                 <div class="panel-actions">
                     <button id="add-object-btn" class="btn btn-add" title="Add Object">ADD +</button>
                 </div>
@@ -98,35 +100,35 @@
             <div class="panel-content">
                 <div class="add-menu" id="add-menu">
                     <div class="add-menu-section">
-                        <h4>Objects</h4>
+                        <h3>Objects</h3>
                         <button data-type="cube" class="add-item">
-                            <span class="icon">□</span> Cube
+                            <span class="icon" data-icon="cube"></span> Cube
                         </button>
                         <button data-type="sphere" class="add-item">
-                            <span class="icon">○</span> Sphere
+                            <span class="icon" data-icon="sphere"></span> Sphere
                         </button>
                     </div>
                     <div class="add-menu-section">
-                        <h4>Lights</h4>
+                        <h3>Lights</h3>
                         <button data-type="directional" class="add-item">
-                            <span class="icon">&#x2600;&#xFE0E;</span> Directional
+                            <span class="icon" data-icon="directional"></span> Directional
                         </button>
                         <button data-type="point" class="add-item">
-                            <span class="icon">●</span> Point Light
+                            <span class="icon" data-icon="point"></span> Point Light
                         </button>
                         <button data-type="spot" class="add-item">
-                            <span class="icon">◎</span> Spotlight
+                            <span class="icon" data-icon="spot"></span> Spotlight
                         </button>
                     </div>
                 </div>
-                <ul id="scene-list" class="scene-list"></ul>
+                <ul id="scene-list" class="scene-list" role="listbox" aria-label="Scene items"></ul>
             </div>
         </aside>
 
         <!-- Right Panel: Properties -->
         <aside id="right-panel" class="panel">
             <div class="panel-header">
-                <h3>Properties</h3>
+                <h2>Properties</h2>
             </div>
             <div class="panel-content" id="properties-content">
                 <div class="no-selection">
@@ -139,39 +141,39 @@
         <footer id="toolbar">
             <div class="tool-group">
                 <span class="tool-group-tag">Object</span>
-                <button id="tool-select" class="tool-btn active" title="Select (Q)">
-                    <span class="tool-icon">⊡</span>
+                <button id="tool-select" class="tool-btn active" title="Select (Q)" aria-label="Select tool">
+                    <span class="tool-icon" data-icon="select"></span>
                 </button>
-                <button id="tool-move" class="tool-btn" title="Move (W)">
-                    <span class="tool-icon">✥</span>
+                <button id="tool-move" class="tool-btn" title="Move (W)" aria-label="Move tool">
+                    <span class="tool-icon" data-icon="move"></span>
                 </button>
-                <button id="tool-rotate" class="tool-btn" title="Rotate (E)">
-                    <span class="tool-icon">↻</span>
+                <button id="tool-rotate" class="tool-btn" title="Rotate (E)" aria-label="Rotate tool">
+                    <span class="tool-icon" data-icon="rotate"></span>
                 </button>
-                <button id="tool-scale" class="tool-btn" title="Scale (R)">
-                    <span class="tool-icon">⤢</span>
+                <button id="tool-scale" class="tool-btn" title="Scale (R)" aria-label="Scale tool">
+                    <span class="tool-icon" data-icon="scale"></span>
                 </button>
                 <span class="tool-group-divider"></span>
-                <button id="delete-btn" class="tool-btn" title="Delete (Del)">
-                    <span class="tool-icon">✕</span>
+                <button id="delete-btn" class="tool-btn" title="Delete (Del)" aria-label="Delete">
+                    <span class="tool-icon" data-icon="delete"></span>
                 </button>
-                <button id="duplicate-btn" class="tool-btn" title="Duplicate (Ctrl+D)">
-                    <span class="tool-icon">⧉</span>
+                <button id="duplicate-btn" class="tool-btn" title="Duplicate (Ctrl+D)" aria-label="Duplicate">
+                    <span class="tool-icon" data-icon="duplicate"></span>
                 </button>
             </div>
             <div class="tool-group">
                 <span class="tool-group-tag">History</span>
-                <button id="undo-btn" class="tool-btn" title="Undo (Ctrl+Z)">
-                    <span class="tool-icon">↶</span>
+                <button id="undo-btn" class="tool-btn" title="Undo (Ctrl+Z)" aria-label="Undo">
+                    <span class="tool-icon" data-icon="undo"></span>
                 </button>
-                <button id="redo-btn" class="tool-btn" title="Redo (Ctrl+Y)">
-                    <span class="tool-icon">↷</span>
+                <button id="redo-btn" class="tool-btn" title="Redo (Ctrl+Y)" aria-label="Redo">
+                    <span class="tool-icon" data-icon="redo"></span>
                 </button>
             </div>
             <div class="tool-group">
                 <span class="tool-group-tag">Camera</span>
-                <button id="reset-camera-btn" class="tool-btn" title="Reset Camera">
-                    <span class="tool-icon">⌂</span>
+                <button id="reset-camera-btn" class="tool-btn" title="Reset Camera" aria-label="Reset camera">
+                    <span class="tool-icon" data-icon="camera"></span>
                 </button>
             </div>
             <div class="camera-controls-hint" id="camera-controls-hint">

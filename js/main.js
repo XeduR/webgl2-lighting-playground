@@ -8,6 +8,7 @@ import { Camera, OrbitControls } from './camera.js';
 import { createDefaultScene } from './scene.js';
 import { UIController } from './ui.js';
 import { ToolController } from './tools.js';
+import { ICONS } from './icons.js';
 
 class Application {
     constructor() {
@@ -32,6 +33,9 @@ class Application {
 
     async init() {
         try {
+            // Fill static [data-icon] placeholders with inline SVG.
+            this.injectIcons();
+
             // Initialize renderer
             this.renderer = new Renderer(this.canvas);
 
@@ -131,10 +135,10 @@ class Application {
             const btn = side === 'left' ? btnLeft : btnRight;
             const collapsed = app.classList.contains(`${side}-collapsed`);
             if (side === 'left') {
-                btn.textContent = collapsed ? '\u25B6\uFE0E' : '\u25C0\uFE0E';
+                btn.innerHTML = collapsed ? ICONS.chevronRight : ICONS.chevronLeft;
                 btn.title = collapsed ? 'Show left panel' : 'Hide left panel';
             } else {
-                btn.textContent = collapsed ? '\u25C0\uFE0E' : '\u25B6\uFE0E';
+                btn.innerHTML = collapsed ? ICONS.chevronLeft : ICONS.chevronRight;
                 btn.title = collapsed ? 'Show right panel' : 'Hide right panel';
             }
         };
@@ -261,14 +265,27 @@ class Application {
         requestAnimationFrame((t) => this.loop(t));
     }
 
-    createOverlay(type, title, message, hint) {
+    // Fill every [data-icon] placeholder with its inline SVG from the icon set.
+    injectIcons() {
+        for (const el of document.querySelectorAll('[data-icon]')) {
+            const svg = ICONS[el.dataset.icon];
+            if (svg) el.innerHTML = svg;
+        }
+    }
+
+    createOverlay(type, title, message, hint, role = 'alert') {
         const div = document.createElement('div');
         div.className = `overlay-dialog ${type}`;
+        div.setAttribute('role', role);
+        div.setAttribute('aria-labelledby', 'overlay-title');
+        div.setAttribute('aria-describedby', 'overlay-msg');
 
         const h2 = document.createElement('h2');
+        h2.id = 'overlay-title';
         h2.textContent = title;
 
         const p = document.createElement('p');
+        p.id = 'overlay-msg';
         p.textContent = message;
 
         const small = document.createElement('p');
@@ -283,16 +300,31 @@ class Application {
     showError(message) {
         this.createOverlay(
             'error', 'WebGL2 Error', message,
-            'Please ensure your browser supports WebGL2 and hardware acceleration is enabled.'
+            'Please ensure your browser supports WebGL2 and hardware acceleration is enabled.',
+            'alert'
         );
     }
 
     showWarning(message) {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'overlay-backdrop';
+        document.body.appendChild(backdrop);
+
         const div = this.createOverlay(
             'warning', 'GPU Memory Warning', message,
-            'Tap anywhere to dismiss.'
+            'Tap anywhere to dismiss.', 'alertdialog'
         );
-        div.addEventListener('click', () => div.remove());
+
+        const dismiss = () => {
+            div.remove();
+            backdrop.remove();
+            document.removeEventListener('keydown', onKey);
+        };
+        const onKey = (e) => { if (e.key === 'Escape') dismiss(); };
+
+        backdrop.addEventListener('click', dismiss);
+        div.addEventListener('click', dismiss);
+        document.addEventListener('keydown', onKey);
     }
 }
 
