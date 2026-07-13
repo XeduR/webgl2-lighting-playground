@@ -157,9 +157,9 @@ export class UIController {
         }
 
         if (entity.type === 'light') {
-            // Directional light: no transform tools, no delete, no duplicate
+            // Directional light: position/scale meaningless, so no transform gizmos; still deletable.
             if (entity.lightType === LightType.DIRECTIONAL) {
-                return { move: true, rotate: true, scale: true, delete: true, duplicate: true };
+                return { move: true, rotate: true, scale: true, delete: false, duplicate: true };
             }
             // Point light: no rotate, no scale
             if (entity.lightType === LightType.POINT) {
