@@ -4,6 +4,9 @@
 
 import { mat4, vec3, degToRad } from './math.js';
 
+// Local forward direction for lights (-Z). Shared constant; never mutated.
+const LOCAL_FORWARD = vec3.create(0, 0, -1);
+
 let entityIdCounter = 0;
 
 // Generate unique entity ID
@@ -39,7 +42,7 @@ export class Transform {
 
     setScale(x, y, z) {
         this.scale[0] = x;
-        this.scale[1] = y;
+        this.scale[1] = y === undefined ? x : y;
         this.scale[2] = z === undefined ? x : z;
         this.dirty = true;
     }
@@ -98,7 +101,6 @@ export class SceneObject {
         this.material = new Material();
         this.visible = true;
         this.castShadow = true;
-        this.receiveShadow = true;
     }
 
     clone() {
@@ -110,7 +112,6 @@ export class SceneObject {
         obj.material = this.material.clone();
         obj.visible = this.visible;
         obj.castShadow = this.castShadow;
-        obj.receiveShadow = this.receiveShadow;
         return obj;
     }
 }
@@ -139,7 +140,6 @@ export class Light {
 
         // Point light properties
         this.range = 10.0;
-        this.decay = 2.0; // Quadratic falloff
 
         // Spot light properties
         this.innerAngle = Math.PI / 6; // 30 degrees
@@ -148,7 +148,6 @@ export class Light {
         // Shadow properties
         this.castShadow = true;
         this.shadowBias = 0.002;
-        this.shadowMapSize = 1024;
         this.shadowNear = 0.1;
         this.shadowFar = 50.0;
 
@@ -156,26 +155,12 @@ export class Light {
         this.viewMatrix = mat4.create();
         this.projectionMatrix = mat4.create();
         this.shadowMatrix = mat4.create();
-
-        // Shadow map resources (set by renderer)
-        this.shadowFramebuffer = null;
-        this.shadowTexture = null;
-        this.transmissionFramebuffer = null;
-        this.transmissionTexture = null;
     }
 
     // Get world-space direction for directional lights
     getDirection(out) {
-        // Default direction is -Z
-        const dir = vec3.create(0, 0, -1);
         this.transform.updateMatrix();
-        vec3.transformDirection(out, dir, this.transform.modelMatrix);
-        return out;
-    }
-
-    // Get world-space position
-    getPosition(out) {
-        vec3.copy(out, this.transform.position);
+        vec3.transformDirection(out, LOCAL_FORWARD, this.transform.modelMatrix);
         return out;
     }
 
@@ -257,12 +242,10 @@ export class Light {
         vec3.copy(light.color, this.color);
         light.intensity = this.intensity;
         light.range = this.range;
-        light.decay = this.decay;
         light.innerAngle = this.innerAngle;
         light.outerAngle = this.outerAngle;
         light.castShadow = this.castShadow;
         light.shadowBias = this.shadowBias;
-        light.shadowMapSize = this.shadowMapSize;
         return light;
     }
 }
@@ -337,35 +320,9 @@ export class Scene {
         return [...this.objects, ...this.lights];
     }
 
-    // Get all opaque objects (sorted by distance to camera for efficiency)
-    getOpaqueObjects() {
-        return this.objects.filter(obj => obj.visible && obj.material.opacity >= 1.0);
-    }
-
-    // Get all translucent objects (sorted back-to-front)
-    getTranslucentObjects(cameraPosition) {
-        const translucent = this.objects.filter(
-            obj => obj.visible && obj.material.opacity < 1.0
-        );
-
-        // Sort by distance to camera (back to front)
-        translucent.sort((a, b) => {
-            const distA = vec3.distance(cameraPosition, a.transform.position);
-            const distB = vec3.distance(cameraPosition, b.transform.position);
-            return distB - distA;
-        });
-
-        return translucent;
-    }
-
     // Get all visible lights
     getVisibleLights() {
         return this.lights.filter(light => light.visible);
-    }
-
-    // Get shadow-casting lights
-    getShadowCastingLights() {
-        return this.lights.filter(light => light.visible && light.castShadow);
     }
 
     // Update all transforms
@@ -506,7 +463,6 @@ export function createDefaultScene() {
     sunLight.transform.setRotation(degToRad(-45), degToRad(30), degToRad(0));
     sunLight.color = vec3.create(1.0, 1.0, 1.0);
     sunLight.intensity = 1.2;
-    sunLight.shadowMapSize = 2048;
     scene.addLight(sunLight);
 
     return scene;

@@ -4,6 +4,7 @@
 */
 
 import { vec3, mat4, radToDeg, degToRad } from './math.js';
+import { GEOMETRY_BOUNDS } from './geometry.js';
 
 // Axis definitions
 const AXES = {
@@ -424,13 +425,11 @@ export class ToolController {
         const localOrigin = vec3.create();
         const localDir = vec3.create();
 
-        // Local-space AABB: unit box for all geometry types
-        const bmin = [-0.5, -0.5, -0.5];
-        const bmax = [0.5, 0.5, 0.5];
-
-        // Test scene objects using ray-AABB in local space
+        // Test scene objects using ray-AABB in each object's local-space bounds
         for (const obj of this.scene.objects) {
             if (!obj.visible) continue;
+
+            const bounds = GEOMETRY_BOUNDS[obj.geometryType] || GEOMETRY_BOUNDS.cube;
 
             // Ensure model matrix is up to date
             obj.transform.updateMatrix();
@@ -446,7 +445,7 @@ export class ToolController {
             vec3.subtract(localDir, localDir, localOrigin);
             vec3.normalize(localDir, localDir);
 
-            const tLocal = this.rayAABBIntersect(localOrigin, localDir, bmin, bmax);
+            const tLocal = this.rayAABBIntersect(localOrigin, localDir, bounds.min, bounds.max);
             if (tLocal < 0) continue;
 
             // Compute world-space hit point to get true distance

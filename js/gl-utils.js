@@ -164,38 +164,6 @@ export function createDepthFramebuffer(gl, width, height) {
     return { framebuffer, depthTexture, width, height };
 }
 
-// Create a framebuffer with color and depth attachments
-export function createColorDepthFramebuffer(gl, width, height, colorFormat = gl.RGBA8) {
-    const framebuffer = gl.createFramebuffer();
-
-    const colorTexture = createTexture(gl, {
-        width,
-        height,
-        internalFormat: colorFormat,
-        format: gl.RGBA,
-        type: colorFormat === gl.RGBA16F ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE,
-        minFilter: gl.LINEAR,
-        magFilter: gl.LINEAR
-    });
-
-    const depthRenderbuffer = gl.createRenderbuffer();
-    gl.bindRenderbuffer(gl.RENDERBUFFER, depthRenderbuffer);
-    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, width, height);
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorTexture, 0);
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthRenderbuffer);
-
-    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-    if (status !== gl.FRAMEBUFFER_COMPLETE) {
-        throw new Error(`Framebuffer incomplete: ${status}`);
-    }
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
-    return { framebuffer, colorTexture, depthRenderbuffer, width, height };
-}
-
 // Create a transmission shadow map framebuffer (color + depth)
 export function createTransmissionFramebuffer(gl, width, height) {
     const framebuffer = gl.createFramebuffer();
@@ -272,30 +240,6 @@ export function createVAO(gl, attributes, indexBuffer = null) {
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
     return vao;
-}
-
-// Resize a texture
-export function resizeTexture(gl, texture, width, height, internalFormat, format, type) {
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, null);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-}
-
-// Check for WebGL errors
-export function checkGLError(gl, context = '') {
-    const error = gl.getError();
-    if (error !== gl.NO_ERROR) {
-        const errorNames = {
-            [gl.INVALID_ENUM]: 'INVALID_ENUM',
-            [gl.INVALID_VALUE]: 'INVALID_VALUE',
-            [gl.INVALID_OPERATION]: 'INVALID_OPERATION',
-            [gl.INVALID_FRAMEBUFFER_OPERATION]: 'INVALID_FRAMEBUFFER_OPERATION',
-            [gl.OUT_OF_MEMORY]: 'OUT_OF_MEMORY'
-        };
-        console.error(`WebGL Error${context ? ` (${context})` : ''}: ${errorNames[error] || error}`);
-        return false;
-    }
-    return true;
 }
 
 // Get WebGL capabilities and limits

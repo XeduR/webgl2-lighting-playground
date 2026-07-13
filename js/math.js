@@ -111,25 +111,6 @@ export const vec3 = {
     }
 };
 
-// Vector4 Operations
-export const vec4 = {
-    create: (x = 0, y = 0, z = 0, w = 1) => new Float32Array([x, y, z, w]),
-
-    set: (out, x, y, z, w) => {
-        out[0] = x; out[1] = y; out[2] = z; out[3] = w;
-        return out;
-    },
-
-    transformMat4: (out, a, m) => {
-        const x = a[0], y = a[1], z = a[2], w = a[3];
-        out[0] = m[0] * x + m[4] * y + m[8] * z + m[12] * w;
-        out[1] = m[1] * x + m[5] * y + m[9] * z + m[13] * w;
-        out[2] = m[2] * x + m[6] * y + m[10] * z + m[14] * w;
-        out[3] = m[3] * x + m[7] * y + m[11] * z + m[15] * w;
-        return out;
-    }
-};
-
 // Matrix 4x4 Operations
 export const mat4 = {
     create: () => {
@@ -263,39 +244,6 @@ export const mat4 = {
         out[2] = a02 * c + a12 * s; out[3] = a03 * c + a13 * s;
         out[4] = a10 * c - a00 * s; out[5] = a11 * c - a01 * s;
         out[6] = a12 * c - a02 * s; out[7] = a13 * c - a03 * s;
-        return out;
-    },
-
-    fromRotationTranslationScale: (out, rotation, translation, scale) => {
-        // Euler rotation in radians (XYZ order)
-        const rx = rotation[0], ry = rotation[1], rz = rotation[2];
-        const sx = scale[0], sy = scale[1], sz = scale[2];
-        const tx = translation[0], ty = translation[1], tz = translation[2];
-
-        const cx = Math.cos(rx), sx_ = Math.sin(rx);
-        const cy = Math.cos(ry), sy_ = Math.sin(ry);
-        const cz = Math.cos(rz), sz_ = Math.sin(rz);
-
-        out[0] = cy * cz * sx;
-        out[1] = cy * sz_ * sx;
-        out[2] = -sy_ * sx;
-        out[3] = 0;
-
-        out[4] = (sx_ * sy_ * cz - cx * sz_) * sy;
-        out[5] = (sx_ * sy_ * sz_ + cx * cz) * sy;
-        out[6] = sx_ * cy * sy;
-        out[7] = 0;
-
-        out[8] = (cx * sy_ * cz + sx_ * sz_) * sz;
-        out[9] = (cx * sy_ * sz_ - sx_ * cz) * sz;
-        out[10] = cx * cy * sz;
-        out[11] = 0;
-
-        out[12] = tx;
-        out[13] = ty;
-        out[14] = tz;
-        out[15] = 1;
-
         return out;
     },
 
@@ -452,15 +400,6 @@ export const mat4 = {
         out[3] = b10 * det; out[4] = b11 * det; out[5] = b12 * det;
         out[6] = b20 * det; out[7] = b21 * det; out[8] = b22 * det;
 
-        return out;
-    }
-};
-
-// Matrix 3x3 Operations
-export const mat3 = {
-    create: () => {
-        const out = new Float32Array(9);
-        out[0] = 1; out[4] = 1; out[8] = 1;
         return out;
     }
 };

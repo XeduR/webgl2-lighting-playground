@@ -20,6 +20,14 @@ import { GeometryCache, createMeshVAO } from "./geometry.js";
 import { LightType } from "./scene.js";
 import * as Shaders from "./shaders.js";
 
+// Scene background clear color (0e0e0e). Single source used by every pass reset.
+export const BACKGROUND_COLOR = [0.0549, 0.0549, 0.0549, 1.0];
+
+// Light and shadow-slot caps. MAX_LIGHTS must match the MAX_LIGHTS #define in shaders.js.
+const MAX_LIGHTS = 16;
+const MAX_DIR_SPOT_SHADOWS = 4;
+const MAX_POINT_SHADOWS = 2;
+
 export const QualityPresets = {
     low: { shadowMapSize: 512, softShadows: false, transmissionEnabled: true },
     medium: { shadowMapSize: 1024, softShadows: true, transmissionEnabled: true },
@@ -48,20 +56,28 @@ export class Renderer {
             this.initialize();
         });
 
-        // Activate float texture support (required for R32F point shadow atlas)
-        this.gl.getExtension("EXT_color_buffer_float");
-
+        // Float color-buffer support is required to render the R32F point shadow atlas.
+        // getGLCapabilities also activates the extension; point shadows fall back off when absent.
         this.capabilities = getGLCapabilities(this.gl);
+        this.pointShadowsSupported = !!this.capabilities.colorBufferFloat;
 
         this.isMobile = window.mobileCheck();
 
-        // Check if a previous quality change crashed the page
-        const crashData = sessionStorage.getItem("webgl-quality-attempt");
+        // Check if a previous quality change crashed the page.
+        // Guard against corrupt/unavailable storage so init can't be broken by it.
+        let crashData = null;
+        try {
+            const raw = sessionStorage.getItem("webgl-quality-attempt");
+            if (raw) {
+                sessionStorage.removeItem("webgl-quality-attempt");
+                crashData = JSON.parse(raw);
+            }
+        } catch (e) {
+            crashData = null;
+        }
         if (crashData) {
-            sessionStorage.removeItem("webgl-quality-attempt");
-            const parsed = JSON.parse(crashData);
-            this.quality = parsed.safe;
-            this.crashRecovery = parsed.attempted;
+            this.quality = crashData.safe;
+            this.crashRecovery = crashData.attempted;
         } else {
             this.quality = this.isMobile ? "low" : "high";
             this.crashRecovery = null;
@@ -95,6 +111,8 @@ export class Renderer {
         this._scratchProj = mat4.create();
         this._scratchView = mat4.create();
         this._scratchTarget = vec3.create();
+        // Shared identity matrix for empty shadow slots (never mutated)
+        this._identityMatrix = mat4.create();
 
         this.toolController = null;
 
@@ -114,14 +132,14 @@ export class Renderer {
 
         this.geometryCache = new GeometryCache(gl);
         this.createVAOs();
-        this.createShadowResources(4, 2);
+        this.createShadowResources(MAX_DIR_SPOT_SHADOWS, MAX_POINT_SHADOWS);
         this.createLightGeometry();
 
         gl.enable(gl.DEPTH_TEST);
         gl.depthFunc(gl.LEQUAL);
         gl.enable(gl.CULL_FACE);
         gl.cullFace(gl.BACK);
-        gl.clearColor(0.05, 0.05, 0.07, 1.0);
+        gl.clearColor(...BACKGROUND_COLOR);
     }
 
     createMainProgram() {
@@ -141,7 +159,7 @@ export class Renderer {
             "uSoftShadows"
         ];
 
-        for (let i = 0; i < 16; i++) {
+        for (let i = 0; i < MAX_LIGHTS; i++) {
             uniforms.push(
                 `uLightTypes[${i}]`, `uLightPositions[${i}]`, `uLightDirections[${i}]`,
                 `uLightColors[${i}]`, `uLightIntensities[${i}]`, `uLightRanges[${i}]`,
@@ -149,10 +167,10 @@ export class Renderer {
             );
         }
 
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < MAX_DIR_SPOT_SHADOWS; i++) {
             uniforms.push(`uShadowBias[${i}]`, `uShadowLightIndex[${i}]`);
         }
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < MAX_POINT_SHADOWS; i++) {
             uniforms.push(`uPointFarPlane[${i}]`, `uPointShadowPos[${i}]`, `uPointShadowLightIndex[${i}]`);
         }
 
@@ -276,7 +294,9 @@ export class Renderer {
             this.transmissionFramebuffers.push(createTransmissionFramebuffer(gl, size, size));
         }
 
-        for (let i = 0; i < maxPoint; i++) {
+        // Skip point shadow atlases entirely when float rendering is unavailable.
+        const actualMaxPoint = this.pointShadowsSupported ? maxPoint : 0;
+        for (let i = 0; i < actualMaxPoint; i++) {
             this.pointShadowFramebuffers.push(this.createPointShadowAtlas(size));
             this.pointTransmissionFramebuffers.push(this.createPointTransmissionAtlas(size));
         }
@@ -303,7 +323,11 @@ export class Renderer {
         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, width, height);
         gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
 
+        const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        if (status !== gl.FRAMEBUFFER_COMPLETE) {
+            throw new Error(`Point shadow atlas framebuffer incomplete: ${status}`);
+        }
         return { framebuffer, depthTexture, depthBuffer, width, height, faceSize };
     }
 
@@ -328,7 +352,11 @@ export class Renderer {
         gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, width, height);
         gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
 
+        const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        if (status !== gl.FRAMEBUFFER_COMPLETE) {
+            throw new Error(`Point transmission atlas framebuffer incomplete: ${status}`);
+        }
         return { framebuffer, colorTexture, depthBuffer, width, height, faceSize };
     }
 
@@ -450,21 +478,24 @@ export class Renderer {
         // If the new allocation crashes the page, the reload finds this flag
         // and reverts to the safe quality with a warning.
         const existing = sessionStorage.getItem("webgl-quality-attempt");
-        if (!existing) {
+        let record = null;
+        if (existing) {
+            try { record = JSON.parse(existing); } catch (e) { record = null; }
+        }
+        if (record) {
+            // Rapid changes: keep the original safe quality, update the target
+            record.attempted = preset;
+            sessionStorage.setItem("webgl-quality-attempt", JSON.stringify(record));
+        } else {
             sessionStorage.setItem("webgl-quality-attempt", JSON.stringify({
                 attempted: preset, safe: this.quality
             }));
-        } else {
-            // Rapid changes: keep the original safe quality, update the target
-            const parsed = JSON.parse(existing);
-            parsed.attempted = preset;
-            sessionStorage.setItem("webgl-quality-attempt", JSON.stringify(parsed));
         }
 
         this.quality = preset;
         this.transmissionEnabled = QualityPresets[preset].transmissionEnabled;
         if (this.currentShadowMapSize !== QualityPresets[preset].shadowMapSize) {
-            this.createShadowResources(4, 2);
+            this.createShadowResources(MAX_DIR_SPOT_SHADOWS, MAX_POINT_SHADOWS);
         }
 
         // Survived allocation. Clear the flag after two frames to confirm the
@@ -492,9 +523,25 @@ export class Renderer {
         camera.update();
 
         const allLights = scene.getVisibleLights();
+        if (allLights.length > MAX_LIGHTS && !this._warnedLightCap) {
+            this._warnedLightCap = true;
+            console.warn(`Scene has ${allLights.length} visible lights; only the first ${MAX_LIGHTS} are rendered.`);
+        }
+
         const shadowLights = allLights.filter(l => l.castShadow);
-        const dirSpotShadows = shadowLights.filter(l => l.lightType !== LightType.POINT).slice(0, 4);
-        const pointShadows = shadowLights.filter(l => l.lightType === LightType.POINT).slice(0, 2);
+        const dirSpotCasters = shadowLights.filter(l => l.lightType !== LightType.POINT);
+        const pointCasters = shadowLights.filter(l => l.lightType === LightType.POINT);
+        const dirSpotShadows = dirSpotCasters.slice(0, MAX_DIR_SPOT_SHADOWS);
+        const pointShadows = this.pointShadowsSupported ? pointCasters.slice(0, MAX_POINT_SHADOWS) : [];
+
+        if (!this._warnedShadowCap && (dirSpotCasters.length > MAX_DIR_SPOT_SHADOWS || pointCasters.length > MAX_POINT_SHADOWS)) {
+            this._warnedShadowCap = true;
+            console.warn(`Shadow-casting lights exceed limits (${MAX_DIR_SPOT_SHADOWS} directional/spot, ${MAX_POINT_SHADOWS} point); extra lights cast no shadow.`);
+        }
+        if (!this.pointShadowsSupported && pointCasters.length > 0 && !this._warnedNoFloat) {
+            this._warnedNoFloat = true;
+            console.warn("EXT_color_buffer_float unavailable; point-light shadows are disabled on this device.");
+        }
 
         scene.calculateBounds();
         const center = scene.getCenter();
@@ -599,7 +646,7 @@ export class Renderer {
                 gl.clearColor(0, 0, 0, 1);
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             }
-            gl.clearColor(0.05, 0.05, 0.07, 1.0);
+            gl.clearColor(...BACKGROUND_COLOR);
             return;
         }
 
@@ -660,7 +707,7 @@ export class Renderer {
             gl.blendFunc(gl.ONE, gl.ZERO); // Reset to default
         }
 
-        gl.clearColor(0.05, 0.05, 0.07, 1.0);
+        gl.clearColor(...BACKGROUND_COLOR);
         gl.bindVertexArray(null);
     }
 
@@ -717,7 +764,7 @@ export class Renderer {
             }
         }
 
-        gl.clearColor(0.05, 0.05, 0.07, 1.0);
+        gl.clearColor(...BACKGROUND_COLOR);
         gl.bindVertexArray(null);
     }
 
@@ -812,7 +859,7 @@ export class Renderer {
             }
         }
 
-        gl.clearColor(0.05, 0.05, 0.07, 1.0);
+        gl.clearColor(...BACKGROUND_COLOR);
         gl.bindVertexArray(null);
     }
 
@@ -828,7 +875,7 @@ export class Renderer {
         gl.uniform3fv(prog.uniforms.uAmbientColor, scene.ambientColor);
         gl.uniform1f(prog.uniforms.uAmbientIntensity, scene.ambientIntensity);
 
-        const numLights = Math.min(allLights.length, 16);
+        const numLights = Math.min(allLights.length, MAX_LIGHTS);
         gl.uniform1i(prog.uniforms.uNumLights, numLights);
 
         const lightDir = this._scratchLightDir;
@@ -857,7 +904,7 @@ export class Renderer {
         const transDepths = ["uTransmissionDepth0", "uTransmissionDepth1", "uTransmissionDepth2", "uTransmissionDepth3"];
         const shadowMats = ["uShadowMatrix0", "uShadowMatrix1", "uShadowMatrix2", "uShadowMatrix3"];
 
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < MAX_DIR_SPOT_SHADOWS; i++) {
             gl.activeTexture(gl.TEXTURE0 + i);
             gl.bindTexture(gl.TEXTURE_2D, this.shadowFramebuffers[i]?.depthTexture || null);
             gl.uniform1i(prog.uniforms[shadowMaps[i]], i);
@@ -876,7 +923,7 @@ export class Renderer {
                 gl.uniform1f(prog.uniforms[`uShadowBias[${i}]`], dirSpotShadows[i].shadowBias);
                 gl.uniform1i(prog.uniforms[`uShadowLightIndex[${i}]`], allLights.indexOf(dirSpotShadows[i]));
             } else {
-                gl.uniformMatrix4fv(prog.uniforms[shadowMats[i]], false, mat4.create());
+                gl.uniformMatrix4fv(prog.uniforms[shadowMats[i]], false, this._identityMatrix);
                 gl.uniform1f(prog.uniforms[`uShadowBias[${i}]`], 0.002);
                 gl.uniform1i(prog.uniforms[`uShadowLightIndex[${i}]`], -1);
             }
@@ -901,7 +948,7 @@ export class Renderer {
         gl.bindTexture(gl.TEXTURE_2D, this.pointTransmissionFramebuffers[1]?.colorTexture || null);
         gl.uniform1i(prog.uniforms.uPointTransmissionMap1, 11);
 
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < MAX_POINT_SHADOWS; i++) {
             if (i < pointShadows.length) {
                 gl.uniform1f(prog.uniforms[`uPointFarPlane[${i}]`], pointShadows[i].range);
                 gl.uniform3fv(prog.uniforms[`uPointShadowPos[${i}]`], pointShadows[i].transform.position);

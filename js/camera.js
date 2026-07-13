@@ -46,22 +46,6 @@ export class Camera {
 
         this.dirty = false;
     }
-
-    // Get camera forward direction
-    getForward(out) {
-        out[0] = -this.viewMatrix[2];
-        out[1] = -this.viewMatrix[6];
-        out[2] = -this.viewMatrix[10];
-        return vec3.normalize(out, out);
-    }
-
-    // Get camera right direction
-    getRight(out) {
-        out[0] = this.viewMatrix[0];
-        out[1] = this.viewMatrix[4];
-        out[2] = this.viewMatrix[8];
-        return vec3.normalize(out, out);
-    }
 }
 
 // Orbit controls for camera manipulation
@@ -356,13 +340,4 @@ export class OrbitControls {
         vec3.copy(this.camera.target, this.target);
         this.camera.dirty = true;
     }
-
-    // Focus on a point
-    focusOn(point, distance = null) {
-        vec3.copy(this.targetTarget, point);
-        if (distance !== null) {
-            this.targetDistance = distance;
-        }
-    }
-
 }

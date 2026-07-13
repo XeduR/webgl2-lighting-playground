@@ -3,7 +3,7 @@
 */
 
 import { vec3, hexToRgb, rgbToHex, degToRad, radToDeg } from './math.js';
-import { SceneObject, Light, LightType } from './scene.js';
+import { SceneObject, Light, LightType, createDefaultScene } from './scene.js';
 
 // Escape HTML entities to prevent injection via innerHTML
 const escHTML = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -222,21 +222,18 @@ export class UIController {
                 entity = new SceneObject('New Cube', 'cube');
                 entity.transform.setPosition(0, 0.5, 0);
                 entity.castShadow = true;
-                entity.receiveShadow = true;
                 this.scene.addObject(entity);
                 break;
             case 'sphere':
                 entity = new SceneObject('New Sphere', 'sphere');
                 entity.transform.setPosition(0, 0.5, 0);
                 entity.castShadow = true;
-                entity.receiveShadow = true;
                 this.scene.addObject(entity);
                 break;
             case 'plane':
                 entity = new SceneObject('New Plane', 'plane');
                 entity.transform.setPosition(0, 0, 0);
                 entity.castShadow = true;
-                entity.receiveShadow = true;
                 this.scene.addObject(entity);
                 break;
             case 'directional':
@@ -288,7 +285,8 @@ export class UIController {
         const currentIndex = allEntities.indexOf(entity);
 
         const entityType = entity.type === 'object' ? 'object' : 'light';
-        this.pushUndo({ type: 'delete', entity: entity.clone ? entity.clone() : entity, entityType });
+        // Store the live entity (not a clone) so its id stays stable across undo/redo.
+        this.pushUndo({ type: 'delete', entity, entityType });
         this.scene.removeEntity(entity);
 
         // Select next item (or previous if at end, or null if empty)
@@ -322,34 +320,31 @@ export class UIController {
     }
 
     resetScene() {
-        // Import createDefaultScene dynamically to avoid circular deps
-        import('./scene.js').then(({ createDefaultScene }) => {
-            const newScene = createDefaultScene();
-            this.scene.clear();
+        const newScene = createDefaultScene();
+        this.scene.clear();
 
-            for (const obj of newScene.objects) {
-                this.scene.addObject(obj);
-            }
-            for (const light of newScene.lights) {
-                this.scene.addLight(light);
-            }
+        for (const obj of newScene.objects) {
+            this.scene.addObject(obj);
+        }
+        for (const light of newScene.lights) {
+            this.scene.addLight(light);
+        }
 
-            this.undoStack = [];
-            this.redoStack = [];
-            this.updateUndoRedoState();
+        this.undoStack = [];
+        this.redoStack = [];
+        this.updateUndoRedoState();
+        this.refreshSceneList();
+
+        // Reset camera if controls are available
+        if (this.controls && this.controls.reset) {
+            this.controls.reset();
+        }
+
+        // Select the Sun (first light) by default
+        if (this.scene.lights.length > 0) {
+            this.scene.selectEntity(this.scene.lights[0]);
             this.refreshSceneList();
-
-            // Reset camera if controls are available
-            if (this.controls && this.controls.reset) {
-                this.controls.reset();
-            }
-
-            // Select the Sun (first light) by default
-            if (this.scene.lights.length > 0) {
-                this.scene.selectEntity(this.scene.lights[0]);
-                this.refreshSceneList();
-            }
-        });
+        }
     }
 
     updateUndoRedoState() {
@@ -810,6 +805,7 @@ export class UIController {
         this.propertiesContent.querySelectorAll('.vector-input input').forEach(input => {
             const prop = input.dataset.prop;
             const axis = parseInt(input.dataset.axis);
+            input.setAttribute('aria-label', `${prop.charAt(0).toUpperCase()}${prop.slice(1)} ${['X', 'Y', 'Z'][axis] || ''}`.trim());
 
             // Update on input (for spinner buttons - continuous)
             input.addEventListener('input', (e) => {
@@ -936,6 +932,7 @@ export class UIController {
         this.propertiesContent.querySelectorAll('.vector-input input').forEach(input => {
             const prop = input.dataset.prop;
             const axis = parseInt(input.dataset.axis);
+            input.setAttribute('aria-label', `${prop.charAt(0).toUpperCase()}${prop.slice(1)} ${['X', 'Y', 'Z'][axis] || ''}`.trim());
 
             // Update on input (for spinner buttons - continuous)
             input.addEventListener('input', (e) => {

@@ -4,6 +4,16 @@
 
 import { createBuffer, createIndexBuffer, createVAO } from './gl-utils.js';
 
+// Base plane dimension in local space (before per-object scaling).
+const PLANE_SIZE = 10;
+
+// Local-space axis-aligned bounds per primitive, shared by rendering and ray picking.
+export const GEOMETRY_BOUNDS = {
+    cube: { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] },
+    sphere: { min: [-0.5, -0.5, -0.5], max: [0.5, 0.5, 0.5] },
+    plane: { min: [-PLANE_SIZE / 2, 0, -PLANE_SIZE / 2], max: [PLANE_SIZE / 2, 0, PLANE_SIZE / 2] }
+};
+
 // Generate cube geometry
 export function createCubeGeometry() {
     // prettier-ignore
@@ -242,7 +252,7 @@ export class GeometryCache {
                 geometry = createSphereGeometry(32, 24);
                 break;
             case 'plane':
-                geometry = createPlaneGeometry(10, 10, 1, 1);
+                geometry = createPlaneGeometry(PLANE_SIZE, PLANE_SIZE, 1, 1);
                 break;
             default:
                 throw new Error(`Unknown geometry type: ${type}`);

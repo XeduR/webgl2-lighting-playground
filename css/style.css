@@ -108,7 +108,7 @@ body {
     max-width: 100%;
     max-height: 100%;
     display: block;
-    background: linear-gradient(135deg, #0d0d10 0%, #15151a 100%);
+    background: #0e0e0e;
     object-fit: none;
     object-position: top left;
 }
