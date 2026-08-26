@@ -73,7 +73,7 @@ Then open `http://localhost:8000` in a browser that supports WebGL2.
 
 ```
 ├── index.html          Main page
-├── manifest.json       PWA manifest
+├── site.webmanifest    PWA manifest
 ├── css/
 │   └── style.css       UI styling
 └── js/
